@@ -75,7 +75,10 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
             {appointment.appointmentType?.name || 'Appointment'}
           </h3>
           <p className="text-sm text-gray-500">
-            Patient ID: {appointment.userId}
+            {appointment.userName
+              ? `Patient: ${appointment.userName}`
+              : `Patient ID: ${appointment.userId}`
+            }
           </p>
         </div>
         <span
