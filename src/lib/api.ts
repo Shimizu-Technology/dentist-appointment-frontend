@@ -60,14 +60,19 @@ export async function updateAppointmentType(
   return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
 
-// ** New function to DELETE an Appointment Type **
 export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
 
 // Appointments
-export async function getAppointments() {
-  return api.get('/appointments');
+// -- Updated to accept page + perPage
+export async function getAppointments(page?: number, perPage?: number) {
+  return api.get('/appointments', {
+    params: {
+      page,
+      per_page: perPage,
+    },
+  });
 }
 
 export async function createAppointment(data: any) {
@@ -84,7 +89,6 @@ export async function cancelAppointment(appointmentId: number) {
 
 // Availabilities
 export async function getDentistAvailability(dentistId: number) {
-  // e.g. GET /dentists/:dentist_id/availabilities
   return api.get(`/dentists/${dentistId}/availabilities`);
 }
 
