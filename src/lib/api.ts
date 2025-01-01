@@ -44,6 +44,7 @@ export async function getDentists() {
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
+
 export async function createAppointmentType(data: {
   name: string;
   duration: number;
@@ -51,6 +52,7 @@ export async function createAppointmentType(data: {
 }) {
   return api.post('/appointment_types', { appointment_type: data });
 }
+
 export async function updateAppointmentType(
   id: number,
   data: { name: string; duration: number; description: string }
@@ -58,16 +60,24 @@ export async function updateAppointmentType(
   return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
 
+// ** New function to DELETE an Appointment Type **
+export async function deleteAppointmentType(id: number) {
+  return api.delete(`/appointment_types/${id}`);
+}
+
 // Appointments
 export async function getAppointments() {
   return api.get('/appointments');
 }
+
 export async function createAppointment(data: any) {
   return api.post('/appointments', { appointment: data });
 }
+
 export async function updateAppointment(appointmentId: number, data: any) {
   return api.patch(`/appointments/${appointmentId}`, { appointment: data });
 }
+
 export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
 }
@@ -97,6 +107,7 @@ export async function updateInsurance(insuranceData: {
 export async function getDependents() {
   return api.get('/dependents');
 }
+
 export async function createDependent(data: {
   firstName: string;
   lastName: string;
@@ -104,6 +115,7 @@ export async function createDependent(data: {
 }) {
   return api.post('/dependents', { dependent: data });
 }
+
 export async function updateDependent(
   dependentId: number,
   data: { firstName: string; lastName: string; dateOfBirth: string }

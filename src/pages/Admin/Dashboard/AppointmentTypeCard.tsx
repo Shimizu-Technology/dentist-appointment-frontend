@@ -1,6 +1,8 @@
-import { Clock, Edit } from 'lucide-react';
+import { Clock, Edit, Trash2 } from 'lucide-react';
 import Button from '../../../components/UI/Button';
 import type { AppointmentType } from '../../../types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { deleteAppointmentType } from '../../../lib/api';
 
 interface AppointmentTypeCardProps {
   type: AppointmentType;
@@ -8,18 +10,53 @@ interface AppointmentTypeCardProps {
 }
 
 export default function AppointmentTypeCard({ type, onEdit }: AppointmentTypeCardProps) {
+  const queryClient = useQueryClient();
+
+  const { mutate: handleDelete, isLoading: isDeleting } = useMutation({
+    mutationFn: () => deleteAppointmentType(type.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointment-types'] });
+    },
+    onError: (err: any) => {
+      alert(`Failed to delete: ${err.message}`);
+    },
+  });
+
+  const confirmDelete = () => {
+    const yes = window.confirm(`Are you sure you want to delete "${type.name}"?`);
+    if (yes) handleDelete();
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">{type.name}</h3>
-        <Button
-          variant="outline"
-          onClick={onEdit}
-          className="flex items-center text-sm"
-        >
-          <Edit className="w-4 h-4 mr-1" />
-          Edit
-        </Button>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">{type.name}</h3>
+        </div>
+        <div className="flex space-x-2">
+          {/* Smaller outline Edit button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEdit}
+            className="flex items-center"
+          >
+            <Edit className="w-4 h-4 mr-1" />
+            Edit
+          </Button>
+
+          {/* Smaller danger Delete button */}
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={confirmDelete}
+            isLoading={isDeleting}
+            className="flex items-center"
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center text-gray-600 mb-4">
