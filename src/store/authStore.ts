@@ -12,20 +12,30 @@ interface AuthState {
   isAdmin: () => boolean;
 }
 
+// Attempt to load user from localStorage if it exists
+const storedUser = localStorage.getItem('user');
+const initialUser = storedUser ? JSON.parse(storedUser) as User : null;
+const initialToken = localStorage.getItem('token') || null;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  // Initialize user to null, token from localStorage
-  user: null,
-  token: localStorage.getItem('token'),
+  user: initialUser,
+  token: initialToken,
 
   setAuth: (user: User, token: string) => {
-    // Save token to localStorage
+    // Save both token and user to localStorage
     localStorage.setItem('token', token);
-    // Set Zustand state
+    localStorage.setItem('user', JSON.stringify(user));
+
+    // Update Zustand state
     set({ user, token });
   },
 
   clearAuth: () => {
+    // Remove both token and user from localStorage
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
+    // Reset state in the store
     set({ user: null, token: null });
   },
 

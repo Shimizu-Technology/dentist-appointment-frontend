@@ -13,16 +13,15 @@ export function useAuth() {
     async (email: string, password: string) => {
       try {
         const response = await loginApi(email, password);
-        // Your Rails endpoint likely returns { jwt: "...", user: {...} }
+        // Adjust if your backend returns { token: "...", user: {...} }
         const { user, jwt } = response.data;
-        // If your backend uses { token: "...", user: {...} }, adjust accordingly.
-
         setAuth(user, jwt);
 
-        // Check if it's actually stored
+        // Debugging: see if token was stored
         console.log('token in localStorage after login:', localStorage.getItem('token'));
+        console.log('user in localStorage after login:', localStorage.getItem('user'));
 
-        // Redirect if needed
+        // Redirect to home (or any page you'd like)
         navigate('/');
         return { success: true };
       } catch (error) {
@@ -43,6 +42,7 @@ export function useAuth() {
         setAuth(user, jwt);
 
         console.log('token in localStorage after signup:', localStorage.getItem('token'));
+        console.log('user in localStorage after signup:', localStorage.getItem('user'));
 
         navigate('/');
         return { success: true };
