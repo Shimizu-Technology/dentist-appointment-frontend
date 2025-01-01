@@ -25,19 +25,19 @@ export default function TimeSlotPicker({
 }: TimeSlotPickerProps) {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
 
-  const selectedDentistId = watch('dentistId');
-  const selectedDate = watch('appointmentDate');
-  const selectedTypeId = watch('appointmentTypeId');
+  // Ensure we watch “dentist_id”, “appointment_date”, “appointment_type_id”
+  const selectedDentistId = watch('dentist_id');
+  const selectedDate = watch('appointment_date');
+  const selectedTypeId = watch('appointment_type_id');
 
-  // Optional: you might have the real appointment type duration
-  const appointmentDuration = 30; // default to 30
+  // If you have dynamic duration, you could watch that too. Otherwise, default:
+  const appointmentDuration = 30; // minutes
 
-  // Query the dentist’s availability
   const { data: availabilityData = [] } = useQuery<Availability[]>({
     queryKey: ['dentist-availability', selectedDentistId],
     queryFn: async () => {
       if (!selectedDentistId) return [];
-      const res = await getDentistAvailability(parseInt(selectedDentistId));
+      const res = await getDentistAvailability(parseInt(selectedDentistId, 10));
       return res.data;
     },
     enabled: !!selectedDentistId,
@@ -45,23 +45,19 @@ export default function TimeSlotPicker({
   });
 
   useEffect(() => {
-    // If any requirement not met, clear
     if (!selectedDentistId || !selectedDate || !selectedTypeId) {
       setAvailableSlots([]);
       return;
     }
-
-    // If no availability data:
     if (!availabilityData.length) {
       setAvailableSlots([]);
       return;
     }
 
-    // Identify dayOfWeek from selectedDate
     const dayObj = new Date(selectedDate);
     const dayOfWeek = dayObj.getDay();
 
-    // Find matching availability for that day
+    // Match dayOfWeek to the availability
     const dayAvailability = availabilityData.find(
       (slot) => slot.dayOfWeek === dayOfWeek
     );
@@ -70,7 +66,7 @@ export default function TimeSlotPicker({
       return;
     }
 
-    // Generate time slots from startTime to endTime
+    // Build the times
     const { startTime, endTime } = dayAvailability;
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
@@ -93,7 +89,6 @@ export default function TimeSlotPicker({
         currentMinute = currentMinute % 60;
       }
     }
-
     setAvailableSlots(slots);
   }, [selectedDentistId, selectedDate, selectedTypeId, availabilityData, appointmentDuration]);
 
@@ -103,7 +98,7 @@ export default function TimeSlotPicker({
         Available Time Slots
       </label>
       <select
-        {...register('appointmentTime', { required: 'Please select a time slot' })}
+        {...register('appointment_time', { required: 'Please select a time slot' })}
         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
         disabled={!selectedDentistId || !selectedDate || !selectedTypeId}
       >
@@ -117,19 +112,13 @@ export default function TimeSlotPicker({
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
 
       {!selectedDentistId && (
-        <p className="mt-1 text-sm text-gray-500">
-          Please select a dentist first
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Please select a dentist first</p>
       )}
       {!selectedDate && selectedDentistId && (
-        <p className="mt-1 text-sm text-gray-500">
-          Please select a date first
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Please select a date first</p>
       )}
       {!selectedTypeId && selectedDate && selectedDentistId && (
-        <p className="mt-1 text-sm text-gray-500">
-          Please select an appointment type
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Please select an appointment type</p>
       )}
     </div>
   );

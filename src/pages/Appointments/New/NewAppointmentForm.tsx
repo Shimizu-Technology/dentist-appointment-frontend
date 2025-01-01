@@ -11,10 +11,10 @@ import TimeSlotPicker from './components/TimeSlotPicker';
 import type { Appointment } from '../../../types';
 
 interface AppointmentFormData {
-  dentistId: string;
-  appointmentTypeId: string;
-  appointmentDate: string;
-  appointmentTime: string;
+  dentist_id: string;
+  appointment_type_id: string;
+  appointment_date: string;
+  appointment_time: string;
   notes?: string;
 }
 
@@ -27,77 +27,82 @@ export default function NewAppointmentForm({ appointment, onSuccess }: NewAppoin
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const defaultValues = appointment ? {
-    dentistId: appointment.dentistId.toString(),
-    appointmentTypeId: appointment.appointmentTypeId.toString(),
-    appointmentDate: new Date(appointment.appointmentTime).toISOString().split('T')[0],
-    appointmentTime: new Date(appointment.appointmentTime).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false 
-    }),
-  } : undefined;
+  const defaultValues = appointment
+    ? {
+        dentist_id: String(appointment.dentistId),
+        appointment_type_id: String(appointment.appointmentTypeId),
+        appointment_date: new Date(appointment.appointmentTime).toISOString().split('T')[0],
+        appointment_time: new Date(appointment.appointmentTime).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
+      }
+    : undefined;
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<AppointmentFormData>({
-    defaultValues
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<AppointmentFormData>({
+    defaultValues,
   });
 
+  // Create or update appointment
   const mutation = useMutation({
     mutationFn: (data: AppointmentFormData) => {
-      const appointmentDateTime = formatAppointmentDate(data.appointmentDate, data.appointmentTime);
-      const appointmentData = {
+      // Combine date + time into an ISO string
+      const isoString = formatAppointmentDate(data.appointment_date, data.appointment_time);
+      const payload = {
         ...data,
-        dentistId: parseInt(data.dentistId),
-        appointmentTypeId: parseInt(data.appointmentTypeId),
-        appointmentTime: appointmentDateTime
+        dentist_id: parseInt(data.dentist_id, 10),
+        appointment_type_id: parseInt(data.appointment_type_id, 10),
+        appointment_time: isoString,
       };
 
-      if (appointment) {
-        return updateAppointment(appointment.id, appointmentData);
-      }
-      return createAppointment(appointmentData);
+      return appointment
+        ? updateAppointment(appointment.id, payload)
+        : createAppointment(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        navigate('/appointments');
-      }
-    }
+      onSuccess ? onSuccess() : navigate('/appointments');
+    },
   });
 
-  const onSubmit = (data: AppointmentFormData) => {
-    mutation.mutate(data);
+  const onSubmit = (formData: AppointmentFormData) => {
+    mutation.mutate(formData);
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-lg p-8">
       <div className="space-y-6">
-        <DentistSelect 
-          register={register} 
-          error={errors.dentistId?.message} 
+        <DentistSelect
+          register={register}
+          error={errors.dentist_id?.message}
         />
 
-        <AppointmentTypeSelect 
+        <AppointmentTypeSelect
           register={register}
-          error={errors.appointmentTypeId?.message}
+          error={errors.appointment_type_id?.message}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <DatePicker
             register={register}
-            error={errors.appointmentDate?.message}
+            error={errors.appointment_date?.message}
             watch={watch}
           />
 
           <TimeSlotPicker
             register={register}
-            error={errors.appointmentTime?.message}
+            error={errors.appointment_time?.message}
             watch={watch}
           />
         </div>
 
+        {/* Additional notes */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Additional Notes

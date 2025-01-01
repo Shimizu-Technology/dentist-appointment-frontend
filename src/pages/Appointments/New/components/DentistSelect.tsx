@@ -13,7 +13,7 @@ export default function DentistSelect({ register, error }: DentistSelectProps) {
     queryFn: async () => {
       const response = await getDentists();
       return response.data;
-    }
+    },
   });
 
   return (
@@ -22,19 +22,18 @@ export default function DentistSelect({ register, error }: DentistSelectProps) {
         Select Dentist
       </label>
       <select
-        {...register('dentistId', { required: 'Please select a dentist' })}
+        // IMPORTANT: “dentist_id”
+        {...register('dentist_id', { required: 'Please select a dentist' })}
         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
       >
         <option value="">Choose a dentist</option>
-        {dentists?.map(dentist => (
+        {dentists?.map((dentist) => (
           <option key={dentist.id} value={dentist.id}>
             Dr. {dentist.firstName} {dentist.lastName} - {dentist.specialty}
           </option>
         ))}
       </select>
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

@@ -13,7 +13,7 @@ export default function AppointmentTypeSelect({ register, error }: AppointmentTy
     queryFn: async () => {
       const response = await getAppointmentTypes();
       return response.data;
-    }
+    },
   });
 
   return (
@@ -22,19 +22,18 @@ export default function AppointmentTypeSelect({ register, error }: AppointmentTy
         Appointment Type
       </label>
       <select
-        {...register('appointmentTypeId', { required: 'Please select an appointment type' })}
+        // IMPORTANT: “appointment_type_id”
+        {...register('appointment_type_id', { required: 'Please select an appointment type' })}
         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
       >
         <option value="">Select type of appointment</option>
-        {appointmentTypes?.map(type => (
+        {appointmentTypes?.map((type) => (
           <option key={type.id} value={type.id}>
             {type.name} ({type.duration} minutes)
           </option>
         ))}
       </select>
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }
