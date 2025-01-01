@@ -11,11 +11,11 @@ interface LoginFormData {
 
 export default function LoginForm() {
   const { login } = useAuth();
-  const { 
-    register, 
+  const {
+    register,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting } 
+    formState: { errors, isSubmitting },
   } = useForm<LoginFormData>();
 
   const onSubmit = async (data: LoginFormData) => {
@@ -30,12 +30,12 @@ export default function LoginForm() {
       <Input
         label="Email"
         type="email"
-        {...register('email', { 
+        {...register('email', {
           required: 'Email is required',
           pattern: {
             value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-            message: 'Invalid email address'
-          }
+            message: 'Invalid email address',
+          },
         })}
         error={errors.email?.message}
       />
@@ -43,12 +43,12 @@ export default function LoginForm() {
       <Input
         label="Password"
         type="password"
-        {...register('password', { 
+        {...register('password', {
           required: 'Password is required',
           minLength: {
             value: 6,
-            message: 'Password must be at least 6 characters'
-          }
+            message: 'Password must be at least 6 characters',
+          },
         })}
         error={errors.password?.message}
       />
@@ -62,7 +62,7 @@ export default function LoginForm() {
       </Button>
 
       <p className="text-center text-sm text-gray-600">
-        Don't have an account?{' '}
+        Don&apos;t have an account?{' '}
         <Link to="/signup" className="text-blue-600 hover:text-blue-500">
           Sign up
         </Link>

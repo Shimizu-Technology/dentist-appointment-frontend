@@ -18,10 +18,10 @@ interface FormData {
   description: string;
 }
 
-export default function AppointmentTypeModal({ 
-  isOpen, 
-  onClose, 
-  appointmentType 
+export default function AppointmentTypeModal({
+  isOpen,
+  onClose,
+  appointmentType
 }: AppointmentTypeModalProps) {
   const {
     register,
@@ -49,6 +49,7 @@ export default function AppointmentTypeModal({
       }
     },
     onSuccess: () => {
+      // Use the array form to avoid TS complaining
       queryClient.invalidateQueries(['appointment-types']);
       onClose();
     },

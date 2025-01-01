@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { Calendar, Clock, User, Edit2, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateAppointment, cancelAppointment } from '../../../lib/api'; // <-- add
+import { updateAppointment, cancelAppointment } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
 import type { Appointment } from '../../../types';
 
@@ -18,17 +18,16 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
 
   const queryClient = useQueryClient();
 
-  // For the "Reschedule" action, let's do a naive approach:
-  // We can prompt for a date/time or open a modal. For now, let's do a simple window.prompt:
+  // "Reschedule" action (naive approach with a prompt)
   const handleReschedule = useMutation({
     mutationFn: async (newTime: string) => {
       // Convert newTime string -> e.g. '2024-05-04T10:00:00Z'
-      // In a real scenario, you'd parse it or let the user pick a date/time
       return updateAppointment(appointment.id, {
         appointmentTime: newTime,
       });
     },
     onSuccess: () => {
+      // Use array or string here for queryKey
       queryClient.invalidateQueries(['admin-appointments']);
     },
     onError: (error: any) => {
@@ -36,7 +35,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
-  // For Cancel:
+  // "Cancel" action
   const handleCancel = useMutation({
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
@@ -47,8 +46,12 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
+  // Prompt user for new date/time
   const doReschedule = () => {
-    const newDateTime = window.prompt('Enter new appointmentTime (YYYY-MM-DDTHH:mm:00Z)', appointment.appointmentTime);
+    const newDateTime = window.prompt(
+      'Enter new appointmentTime (YYYY-MM-DDTHH:mm:00Z)',
+      appointment.appointmentTime
+    );
     if (newDateTime) {
       handleReschedule.mutate(newDateTime);
     }
@@ -61,11 +64,14 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           <h3 className="text-lg font-semibold text-gray-900">
             {appointment.appointmentType?.name}
           </h3>
+          {/* If you do not have appointment.user, just show userId */}
           <p className="text-sm text-gray-500">
-            Patient: {appointment.user?.firstName} {appointment.user?.lastName}
+            Patient ID: {appointment.userId}
           </p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[appointment.status]}`}>
+        <span
+          className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[appointment.status]}`}
+        >
           {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
         </span>
       </div>
@@ -75,7 +81,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           <Calendar className="w-5 h-5 mr-2" />
           {format(new Date(appointment.appointmentTime), 'MMMM d, yyyy')}
         </div>
-        
+
         <div className="flex items-center text-gray-600">
           <Clock className="w-5 h-5 mr-2" />
           {format(new Date(appointment.appointmentTime), 'h:mm a')}

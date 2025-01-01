@@ -5,9 +5,9 @@ import Input from '../../../../components/UI/Input';
 
 interface Availability {
   dentistId: number;
-  dayOfWeek: number;  // e.g. 1 for Monday
-  startTime: string;  // e.g. '09:00'
-  endTime: string;    // e.g. '17:00'
+  dayOfWeek: number; // e.g. 1 for Monday
+  startTime: string; // e.g. '09:00'
+  endTime: string;   // e.g. '17:00'
 }
 
 interface DatePickerProps {
@@ -25,7 +25,7 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
   const selectedDentistId = watch('dentistId');
 
   // Query dentist availability from server
-  const { data: availabilityData } = useQuery<Availability[]>(
+  const { data: availabilityData = [] } = useQuery<Availability[]>(
     ['dentist-availability', selectedDentistId],
     async () => {
       if (!selectedDentistId) return [];
@@ -33,12 +33,21 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
       return res.data; // array of availability
     },
     {
+      // Only run if we have a selected dentist
       enabled: !!selectedDentistId,
+      // Provide a default so TS knows it's an array
+      initialData: [],
     }
   );
 
   useEffect(() => {
-    if (!selectedDentistId || !availabilityData) {
+    if (!selectedDentistId) {
+      setAvailableDates([]);
+      return;
+    }
+
+    // If there's no availability data or it's an empty array:
+    if (!availabilityData.length) {
       setAvailableDates([]);
       return;
     }
@@ -51,9 +60,8 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
       const date = new Date(today);
       date.setDate(today.getDate() + i);
 
-      // Check if this day of week is in availabilityData
+      // Check if this dayOfWeek is in availabilityData
       const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ...
-      // find if there's an availability for this dayOfWeek
       const isAvailable = availabilityData.some((slot) => slot.dayOfWeek === dayOfWeek);
 
       if (isAvailable) {
@@ -82,6 +90,7 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
           Please select a dentist first
         </p>
       )}
+      {/* If we do have a dentistId but no matches in the next 30 days */}
       {selectedDentistId && availableDates.length === 0 && (
         <p className="mt-1 text-sm text-red-600">
           No available dates in the next 30 days

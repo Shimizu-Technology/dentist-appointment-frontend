@@ -36,7 +36,6 @@ export default function NewAppointmentForm({ appointment, onSuccess }: NewAppoin
       minute: '2-digit',
       hour12: false 
     }),
-    notes: appointment.notes
   } : undefined;
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<AppointmentFormData>({

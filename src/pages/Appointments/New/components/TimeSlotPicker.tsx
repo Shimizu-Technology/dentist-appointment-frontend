@@ -5,8 +5,8 @@ import { getDentistAvailability } from '../../../../lib/api';
 interface Availability {
   dentistId: number;
   dayOfWeek: number;
-  startTime: string; 
-  endTime: string; 
+  startTime: string;
+  endTime: string;
 }
 
 interface TimeSlotPickerProps {
@@ -18,18 +18,22 @@ interface TimeSlotPickerProps {
   watch: any;
 }
 
-export default function TimeSlotPicker({ register, error, watch }: TimeSlotPickerProps) {
+export default function TimeSlotPicker({
+  register,
+  error,
+  watch,
+}: TimeSlotPickerProps) {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
 
   const selectedDentistId = watch('dentistId');
   const selectedDate = watch('appointmentDate');
   const selectedTypeId = watch('appointmentTypeId');
 
-  // Get the appointment type duration if needed:
-  // (If your DB includes the appointment type + duration, you can do a separate query or pass it in from the parent)
-  // For simplicity, let's assume 30 minutes or that the parent did a separate query.
+  // Optional: you might have the real appointment type duration
+  const appointmentDuration = 30; // default to 30
 
-  const { data: availabilityData } = useQuery<Availability[]>(
+  // Query the dentist’s availability
+  const { data: availabilityData = [] } = useQuery<Availability[]>(
     ['dentist-availability', selectedDentistId],
     async () => {
       if (!selectedDentistId) return [];
@@ -38,31 +42,37 @@ export default function TimeSlotPicker({ register, error, watch }: TimeSlotPicke
     },
     {
       enabled: !!selectedDentistId,
+      initialData: [],
     }
   );
 
   useEffect(() => {
-    if (!selectedDentistId || !selectedDate || !selectedTypeId || !availabilityData) {
+    // If any requirement not met, clear
+    if (!selectedDentistId || !selectedDate || !selectedTypeId) {
       setAvailableSlots([]);
       return;
     }
 
-    // 1) Identify dayOfWeek from selectedDate
+    // If no availability data:
+    if (!availabilityData.length) {
+      setAvailableSlots([]);
+      return;
+    }
+
+    // Identify dayOfWeek from selectedDate
     const dayObj = new Date(selectedDate);
     const dayOfWeek = dayObj.getDay();
 
-    // 2) Find matching availability for that dayOfWeek
-    const dayAvailability = availabilityData.find((slot) => slot.dayOfWeek === dayOfWeek);
+    // Find matching availability for that day
+    const dayAvailability = availabilityData.find(
+      (slot) => slot.dayOfWeek === dayOfWeek
+    );
     if (!dayAvailability) {
       setAvailableSlots([]);
       return;
     }
 
-    // 3) Determine the appointment duration, for now default to 30
-    const appointmentDuration = 30; 
-    // Or fetch the actual from the selected appointmentType if you have it.
-
-    // 4) Generate time slots from startTime to endTime
+    // Generate time slots from startTime to endTime
     const { startTime, endTime } = dayAvailability;
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
@@ -75,8 +85,8 @@ export default function TimeSlotPicker({ register, error, watch }: TimeSlotPicke
       currentHour < endHour ||
       (currentHour === endHour && currentMinute + appointmentDuration <= endMinute)
     ) {
-      const hourStr = currentHour.toString().padStart(2, '0');
-      const minuteStr = currentMinute.toString().padStart(2, '0');
+      const hourStr = String(currentHour).padStart(2, '0');
+      const minuteStr = String(currentMinute).padStart(2, '0');
       slots.push(`${hourStr}:${minuteStr}`);
 
       currentMinute += appointmentDuration;
@@ -87,7 +97,7 @@ export default function TimeSlotPicker({ register, error, watch }: TimeSlotPicke
     }
 
     setAvailableSlots(slots);
-  }, [selectedDentistId, selectedDate, selectedTypeId, availabilityData]);
+  }, [selectedDentistId, selectedDate, selectedTypeId, availabilityData, appointmentDuration]);
 
   return (
     <div>
@@ -107,6 +117,7 @@ export default function TimeSlotPicker({ register, error, watch }: TimeSlotPicke
         ))}
       </select>
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+
       {!selectedDentistId && (
         <p className="mt-1 text-sm text-gray-500">
           Please select a dentist first

@@ -19,7 +19,7 @@ export default function SignupForm() {
     handleSubmit,
     watch,
     setError,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting },
   } = useForm<SignupFormData>();
 
   const onSubmit = async (data: SignupFormData) => {
@@ -56,8 +56,8 @@ export default function SignupForm() {
           required: 'Email is required',
           pattern: {
             value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-            message: 'Invalid email address'
-          }
+            message: 'Invalid email address',
+          },
         })}
         error={errors.email?.message}
       />
@@ -69,8 +69,8 @@ export default function SignupForm() {
           required: 'Password is required',
           minLength: {
             value: 6,
-            message: 'Password must be at least 6 characters'
-          }
+            message: 'Password must be at least 6 characters',
+          },
         })}
         error={errors.password?.message}
       />
@@ -81,7 +81,7 @@ export default function SignupForm() {
         {...register('confirmPassword', {
           required: 'Please confirm your password',
           validate: (value) =>
-            value === watch('password') || 'Passwords do not match'
+            value === watch('password') || 'Passwords do not match',
         })}
         error={errors.confirmPassword?.message}
       />
