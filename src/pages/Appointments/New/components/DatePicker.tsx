@@ -47,15 +47,18 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
       return;
     }
 
-    // Build next 30 days
+    // Build next 6 months (roughly 180 days)
     const dates: string[] = [];
     const today = new Date();
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 180; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
 
       const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ...
-      const isAvailable = availabilityData.some((slot) => slot.dayOfWeek === dayOfWeek);
+      const isAvailable = availabilityData.some(
+        (slot) => slot.dayOfWeek === dayOfWeek
+      );
+
       if (isAvailable) {
         dates.push(date.toISOString().split('T')[0]);
       }
@@ -76,12 +79,15 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
         })}
         error={error}
       />
+
       {!selectedDentistId && (
-        <p className="mt-1 text-sm text-gray-500">Please select a dentist first</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Please select a dentist first
+        </p>
       )}
       {selectedDentistId && availableDates.length === 0 && (
         <p className="mt-1 text-sm text-red-600">
-          No available dates in the next 30 days
+          No available dates in the next 6 months
         </p>
       )}
     </div>

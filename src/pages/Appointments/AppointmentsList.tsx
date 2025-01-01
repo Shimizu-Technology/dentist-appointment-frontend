@@ -1,15 +1,40 @@
+// src/pages/Appointments/AppointmentsList.tsx
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../lib/api';
 import AppointmentCard from './AppointmentCard';
 import type { Appointment } from '../../types';
 
+/** 
+ * Matches the shape your Rails backend sends:
+ * {
+ *   appointments: [...array of Appointment...],
+ *   meta: {
+ *     currentPage: number,
+ *     totalPages: number,
+ *     totalCount: number,
+ *     perPage: number
+ *   }
+ * }
+ */
+interface AppointmentsApiResponse {
+  appointments: Appointment[];
+  meta: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    perPage: number;
+  };
+}
+
 export default function AppointmentsList() {
-  const { data: appointments, isLoading, error } = useQuery<Appointment[]>({
+  // Use the matching type for the "data" your API actually returns:
+  const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
     queryKey: ['appointments'],
     queryFn: async () => {
       const response = await getAppointments();
-      return response.data;
-    }
+      return response.data; 
+      // NOTE: response.data is now { appointments, meta }, not just an array
+    },
   });
 
   if (isLoading) {
@@ -28,7 +53,10 @@ export default function AppointmentsList() {
     );
   }
 
-  if (!appointments?.length) {
+  // Extract the array of appointments from the object
+  const appointments = data?.appointments || [];
+
+  if (!appointments.length) {
     return (
       <div className="text-center py-12 text-gray-600">
         No appointments scheduled. Book your first appointment now!

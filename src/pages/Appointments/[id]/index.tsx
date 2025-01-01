@@ -1,3 +1,4 @@
+// src/pages/Appointments/[id]/index.tsx
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../../lib/api';
@@ -6,19 +7,35 @@ import AppointmentHeader from './AppointmentHeader';
 import Footer from '../../../components/Layout/Footer';
 import type { Appointment } from '../../../types';
 
+/** 
+ * Same shape as above:
+ * {
+ *   appointments: [...],
+ *   meta: {...}
+ * }
+ */
+interface AppointmentsApiResponse {
+  appointments: Appointment[];
+  meta: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    perPage: number;
+  };
+}
+
 export default function AppointmentShow() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { data: appointments, isLoading } = useQuery<Appointment[]>({
+  // Expect the object with { appointments, meta }
+  const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
     queryKey: ['appointments'],
     queryFn: async () => {
       const response = await getAppointments();
-      return response.data;
-    }
+      return response.data; 
+    },
   });
-
-  const appointment = appointments?.find(a => a.id === Number(id));
 
   if (isLoading) {
     return (
@@ -28,12 +45,38 @@ export default function AppointmentShow() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            Failed to load appointment
+          </h2>
+          <button
+            onClick={() => navigate('/appointments')}
+            className="text-blue-600 hover:text-blue-700"
+          >
+            Return to Appointments
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Extract the array from data
+  const appointments = data?.appointments || [];
+
+  // Find the specific appointment by ID
+  const appointment = appointments.find((a) => a.id === Number(id));
+
   if (!appointment) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">Appointment Not Found</h2>
-          <p className="text-gray-600 mb-4">The appointment you're looking for doesn't exist.</p>
+          <p className="text-gray-600 mb-4">
+            The appointment you're looking for doesn't exist.
+          </p>
           <button
             onClick={() => navigate('/appointments')}
             className="text-blue-600 hover:text-blue-700"
