@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getDentists, getAppointmentTypes } from '../../../../lib/api';
-import { mockAvailability, mockBlockedDays } from '../../../../lib/mockData';
-import { isDayAvailable } from '../../../../utils/availability';
+import { getDentistAvailability } from '../../../../lib/api';
 import Input from '../../../../components/UI/Input';
+
+interface Availability {
+  dentistId: number;
+  dayOfWeek: number;  // e.g. 1 for Monday
+  startTime: string;  // e.g. '09:00'
+  endTime: string;    // e.g. '17:00'
+}
 
 interface DatePickerProps {
   dentistId?: string;
@@ -13,14 +18,27 @@ interface DatePickerProps {
   watch: any;
 }
 
-export default function DatePicker({ dentistId, register, error, watch }: DatePickerProps) {
+export default function DatePicker({ register, error, watch }: DatePickerProps) {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  
+
   // Watch for dentist changes
   const selectedDentistId = watch('dentistId');
 
+  // Query dentist availability from server
+  const { data: availabilityData } = useQuery<Availability[]>(
+    ['dentist-availability', selectedDentistId],
+    async () => {
+      if (!selectedDentistId) return [];
+      const res = await getDentistAvailability(parseInt(selectedDentistId));
+      return res.data; // array of availability
+    },
+    {
+      enabled: !!selectedDentistId,
+    }
+  );
+
   useEffect(() => {
-    if (!selectedDentistId) {
+    if (!selectedDentistId || !availabilityData) {
       setAvailableDates([]);
       return;
     }
@@ -28,18 +46,23 @@ export default function DatePicker({ dentistId, register, error, watch }: DatePi
     // Generate next 30 days
     const dates: string[] = [];
     const today = new Date();
-    
+
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      
-      if (isDayAvailable(parseInt(selectedDentistId), date, mockAvailability, mockBlockedDays)) {
+
+      // Check if this day of week is in availabilityData
+      const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ...
+      // find if there's an availability for this dayOfWeek
+      const isAvailable = availabilityData.some((slot) => slot.dayOfWeek === dayOfWeek);
+
+      if (isAvailable) {
         dates.push(date.toISOString().split('T')[0]);
       }
     }
-    
+
     setAvailableDates(dates);
-  }, [selectedDentistId]);
+  }, [selectedDentistId, availabilityData]);
 
   return (
     <div>
@@ -47,10 +70,10 @@ export default function DatePicker({ dentistId, register, error, watch }: DatePi
         type="date"
         label="Appointment Date"
         min={new Date().toISOString().split('T')[0]}
-        {...register('appointmentDate', { 
+        {...register('appointmentDate', {
           required: 'Please select a date',
-          validate: (value: string) => 
-            availableDates.includes(value) || 'Selected date is not available'
+          validate: (value: string) =>
+            availableDates.includes(value) || 'Selected date is not available',
         })}
         error={error}
       />

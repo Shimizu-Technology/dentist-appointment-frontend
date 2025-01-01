@@ -31,7 +31,6 @@ export async function signup(
       password,
       first_name: firstName,
       last_name: lastName,
-      // phone? ...
     },
   });
 }
@@ -73,13 +72,18 @@ export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
 }
 
+// Availabilities
+export async function getDentistAvailability(dentistId: number) {
+  // e.g. GET /dentists/:dentist_id/availabilities
+  return api.get(`/dentists/${dentistId}/availabilities`);
+}
+
 // Insurance
 export async function updateInsurance(insuranceData: {
   providerName: string;
   policyNumber: string;
   planType: string;
 }) {
-  // e.g. patching current_user
   return api.patch('/users/current/insurance', {
     user: {
       provider_name: insuranceData.providerName,
