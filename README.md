@@ -1,4 +1,3 @@
-```md
 # ISA Dental Frontend
 
 This project is a **React + TypeScript + Vite** front-end for the **ISA Dental** appointment scheduling system. It provides a user-friendly interface for patients (and their dependents) to manage appointments, update insurance info, and communicate with the ISA Dental backend.
@@ -13,8 +12,7 @@ This project is a **React + TypeScript + Vite** front-end for the **ISA Dental**
 4. [Running Locally](#running-locally)  
 5. [Environment Variables](#environment-variables)  
 6. [Deployment](#deployment)  
-7. [Future Enhancements / Next Steps](#future-enhancements--next-steps)  
-8. [License](#license)
+7. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
 
 ---
 
