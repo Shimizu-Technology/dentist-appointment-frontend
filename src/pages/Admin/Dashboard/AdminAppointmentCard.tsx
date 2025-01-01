@@ -13,7 +13,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
   const statusColors = {
     scheduled: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800'
+    cancelled: 'bg-red-100 text-red-800',
   };
 
   const queryClient = useQueryClient();
@@ -21,13 +21,12 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
   // "Reschedule" action (naive approach with a prompt)
   const handleReschedule = useMutation({
     mutationFn: async (newTime: string) => {
-      // Convert newTime string -> e.g. '2024-05-04T10:00:00Z'
+      // Convert newTime string -> e.g. '2025-02-04T10:00:00Z'
       return updateAppointment(appointment.id, {
         appointmentTime: newTime,
       });
     },
     onSuccess: () => {
-      // Use array or string here for queryKey
       queryClient.invalidateQueries(['admin-appointments']);
     },
     onError: (error: any) => {
@@ -57,40 +56,60 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     }
   };
 
+  // Safely parse the date/time
+  let parsedDate: Date | null = null;
+  try {
+    parsedDate = new Date(appointment.appointmentTime);
+    if (isNaN(parsedDate.getTime())) {
+      parsedDate = null;
+    }
+  } catch {
+    parsedDate = null;
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            {appointment.appointmentType?.name}
+            {appointment.appointmentType?.name || 'Appointment'}
           </h3>
-          {/* If you do not have appointment.user, just show userId */}
           <p className="text-sm text-gray-500">
             Patient ID: {appointment.userId}
           </p>
         </div>
         <span
-          className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[appointment.status]}`}
+          className={`px-3 py-1 rounded-full text-sm font-medium ${
+            statusColors[appointment.status] || ''
+          }`}
         >
           {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
         </span>
       </div>
 
       <div className="space-y-3 mb-6">
-        <div className="flex items-center text-gray-600">
-          <Calendar className="w-5 h-5 mr-2" />
-          {format(new Date(appointment.appointmentTime), 'MMMM d, yyyy')}
-        </div>
+        {parsedDate ? (
+          <>
+            <div className="flex items-center text-gray-600">
+              <Calendar className="w-5 h-5 mr-2" />
+              {format(parsedDate, 'MMMM d, yyyy')}
+            </div>
 
-        <div className="flex items-center text-gray-600">
-          <Clock className="w-5 h-5 mr-2" />
-          {format(new Date(appointment.appointmentTime), 'h:mm a')}
-        </div>
+            <div className="flex items-center text-gray-600">
+              <Clock className="w-5 h-5 mr-2" />
+              {format(parsedDate, 'h:mm a')}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-red-500">Invalid date/time</p>
+        )}
 
-        <div className="flex items-center text-gray-600">
-          <User className="w-5 h-5 mr-2" />
-          Dr. {appointment.dentist?.firstName} {appointment.dentist?.lastName}
-        </div>
+        {appointment.dentist && (
+          <div className="flex items-center text-gray-600">
+            <User className="w-5 h-5 mr-2" />
+            Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}
+          </div>
+        )}
       </div>
 
       <div className="flex space-x-4">

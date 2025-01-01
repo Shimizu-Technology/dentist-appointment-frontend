@@ -20,22 +20,37 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       navigate('/appointments');
-    }
+    },
   });
 
   const statusColors = {
     scheduled: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800'
+    cancelled: 'bg-red-100 text-red-800',
   };
 
   const canManage = canManageAppointment(appointment);
+
+  // Safely parse the date/time
+  let parsedDate: Date | null = null;
+  try {
+    parsedDate = new Date(appointment.appointmentTime);
+    if (isNaN(parsedDate.getTime())) {
+      parsedDate = null;
+    }
+  } catch {
+    parsedDate = null;
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-8">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[appointment.status]}`}>
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${
+              statusColors[appointment.status] || ''
+            }`}
+          >
             {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
           </span>
         </div>
@@ -61,26 +76,29 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
       </div>
 
       <div className="space-y-6">
+        {/* DATE */}
         <div className="flex items-start">
           <Calendar className="w-6 h-6 text-blue-600 mt-1 mr-4" />
           <div>
             <h3 className="font-medium text-gray-900">Date</h3>
             <p className="text-gray-600 mt-1">
-              {format(new Date(appointment.appointmentTime), 'MMMM d, yyyy')}
+              {parsedDate ? format(parsedDate, 'MMMM d, yyyy') : 'Invalid date/time'}
             </p>
           </div>
         </div>
 
+        {/* TIME */}
         <div className="flex items-start">
           <Clock className="w-6 h-6 text-blue-600 mt-1 mr-4" />
           <div>
             <h3 className="font-medium text-gray-900">Time</h3>
             <p className="text-gray-600 mt-1">
-              {format(new Date(appointment.appointmentTime), 'h:mm a')}
+              {parsedDate ? format(parsedDate, 'h:mm a') : 'Invalid date/time'}
             </p>
           </div>
         </div>
 
+        {/* DENTIST */}
         <div className="flex items-start">
           <User className="w-6 h-6 text-blue-600 mt-1 mr-4" />
           <div>
@@ -94,12 +112,13 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
           </div>
         </div>
 
+        {/* APPOINTMENT TYPE */}
         <div className="flex items-start">
           <FileText className="w-6 h-6 text-blue-600 mt-1 mr-4" />
           <div>
             <h3 className="font-medium text-gray-900">Appointment Type</h3>
             <p className="text-gray-600 mt-1">
-              {appointment.appointmentType?.name}
+              {appointment.appointmentType?.name || 'N/A'}
             </p>
             <p className="text-gray-500 text-sm">
               Duration: {appointment.appointmentType?.duration} minutes

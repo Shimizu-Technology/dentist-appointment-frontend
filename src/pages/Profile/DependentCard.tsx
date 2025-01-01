@@ -9,6 +9,17 @@ interface DependentCardProps {
 }
 
 export default function DependentCard({ dependent, onEdit }: DependentCardProps) {
+  // Safely parse DOB
+  let parsedDOB: Date | null = null;
+  try {
+    parsedDOB = new Date(dependent.dateOfBirth);
+    if (isNaN(parsedDOB.getTime())) {
+      parsedDOB = null;
+    }
+  } catch {
+    parsedDOB = null;
+  }
+
   return (
     <div className="border rounded-lg p-4">
       <div className="flex justify-between items-start">
@@ -18,7 +29,9 @@ export default function DependentCard({ dependent, onEdit }: DependentCardProps)
           </h3>
           <div className="flex items-center text-gray-500 mt-2">
             <Calendar className="w-4 h-4 mr-2" />
-            {format(new Date(dependent.dateOfBirth), 'MMMM d, yyyy')}
+            {parsedDOB
+              ? format(parsedDOB, 'MMMM d, yyyy')
+              : 'Invalid date of birth'}
           </div>
         </div>
         <Button variant="outline" onClick={onEdit} className="flex items-center">
