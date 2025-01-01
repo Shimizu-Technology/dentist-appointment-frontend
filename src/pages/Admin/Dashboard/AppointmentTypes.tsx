@@ -1,3 +1,4 @@
+// src/pages/Admin/Dashboard/AppointmentTypes.tsx
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import Button from '../../../components/UI/Button';
@@ -20,11 +21,13 @@ export default function AppointmentTypes() {
   });
 
   const handleEdit = (type: AppointmentType) => {
+    // Set the "currently editing" type, so the modal knows which data to pre-fill
     setEditingType(type);
     setIsModalOpen(true);
   };
 
   const handleAdd = () => {
+    // Clear editingType to start with a blank form
     setEditingType(null);
     setIsModalOpen(true);
   };
@@ -52,7 +55,7 @@ export default function AppointmentTypes() {
           <AppointmentTypeCard
             key={type.id}
             type={type}
-            onEdit={() => handleEdit(type)}
+            onEdit={() => handleEdit(type)}  // pass the type we want to edit
           />
         ))}
       </div>
@@ -60,6 +63,7 @@ export default function AppointmentTypes() {
       <AppointmentTypeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        // Provide the type object so the form can pre-populate
         appointmentType={editingType}
       />
     </div>

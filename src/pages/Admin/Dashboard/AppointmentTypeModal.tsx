@@ -1,3 +1,4 @@
+// src/pages/Admin/Dashboard/AppointmentTypeModal.tsx
 import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import Button from '../../../components/UI/Button';
@@ -21,8 +22,11 @@ interface FormData {
 export default function AppointmentTypeModal({
   isOpen,
   onClose,
-  appointmentType
+  appointmentType,
 }: AppointmentTypeModalProps) {
+  const queryClient = useQueryClient();
+
+  // If we have an existing AppointmentType, pre-populate the form with those fields
   const {
     register,
     handleSubmit,
@@ -37,19 +41,18 @@ export default function AppointmentTypeModal({
       : undefined,
   });
 
-  const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       if (appointmentType) {
-        // update existing
+        // Update existing appointment type
         return updateAppointmentType(appointmentType.id, data);
       } else {
-        // create new
+        // Create a new appointment type
         return createAppointmentType(data);
       }
     },
     onSuccess: () => {
-      // Use the array form to avoid TS complaining
+      // Refresh the list
       queryClient.invalidateQueries(['appointment-types']);
       onClose();
     },
@@ -67,6 +70,7 @@ export default function AppointmentTypeModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+        {/* Modal Header */}
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-900">
             {appointmentType ? 'Edit' : 'Add'} Appointment Type
@@ -76,6 +80,7 @@ export default function AppointmentTypeModal({
           </button>
         </div>
 
+        {/* Form Body */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <Input
             label="Name"
@@ -102,21 +107,16 @@ export default function AppointmentTypeModal({
               {...register('description')}
               rows={3}
               className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Optional description..."
             />
           </div>
 
+          {/* Modal Footer */}
           <div className="flex justify-end space-x-4 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onClose}
-            >
+            <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-            >
+            <Button type="submit" isLoading={isSubmitting}>
               {appointmentType ? 'Update' : 'Create'}
             </Button>
           </div>
