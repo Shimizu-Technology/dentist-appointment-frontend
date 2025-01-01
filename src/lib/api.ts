@@ -1,95 +1,108 @@
-// src/lib/api.ts
 import axios from 'axios';
 
-// We'll read API_BASE_URL from .env
-const baseURL = import.meta.env.API_BASE_URL || 'http://localhost:3000/api/v1';
-
-// Create a single axios instance
+// Create axios instance
 const api = axios.create({
-  baseURL,
-  // Optionally set default headers, e.g.:
-  // headers: { 'Content-Type': 'application/json' },
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
 });
 
-// Then define real methods calling the Rails endpoints:
+// Interceptor to attach token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Auth
 export async function login(email: string, password: string) {
-  const response = await api.post('/login', { email, password });
-  return response;
+  return api.post('/login', { email, password });
 }
 
-export async function signup(email: string, password: string, firstName: string, lastName: string) {
-  // Suppose you have a POST /users or /signup
-  const response = await api.post('/users', {
-    email,
-    password,
-    first_name: firstName,
-    last_name: lastName
+export async function signup(
+  email: string,
+  password: string,
+  firstName: string,
+  lastName: string
+) {
+  return api.post('/users', {
+    user: {
+      email,
+      password,
+      first_name: firstName,
+      last_name: lastName,
+      // phone? ...
+    },
   });
-  return response;
 }
 
-// Example of calling GET /dentists
+// Dentists
 export async function getDentists() {
-  const response = await api.get('/dentists');
-  return response;
+  return api.get('/dentists');
 }
 
-// Similarly for appointment types:
+// Appointment Types
 export async function getAppointmentTypes() {
-  const response = await api.get('/appointment_types');
-  return response;
+  return api.get('/appointment_types');
+}
+export async function createAppointmentType(data: {
+  name: string;
+  duration: number;
+  description: string;
+}) {
+  return api.post('/appointment_types', { appointment_type: data });
+}
+export async function updateAppointmentType(
+  id: number,
+  data: { name: string; duration: number; description: string }
+) {
+  return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
 
-// For appointments
+// Appointments
 export async function getAppointments() {
-  const response = await api.get('/appointments');
-  return response;
+  return api.get('/appointments');
 }
 export async function createAppointment(data: any) {
-  const response = await api.post('/appointments', { appointment: data });
-  return response;
+  return api.post('/appointments', { appointment: data });
 }
 export async function updateAppointment(appointmentId: number, data: any) {
-  const response = await api.patch(`/appointments/${appointmentId}`, { appointment: data });
-  return response;
+  return api.patch(`/appointments/${appointmentId}`, { appointment: data });
 }
 export async function cancelAppointment(appointmentId: number) {
-  const response = await api.delete(`/appointments/${appointmentId}`);
-  return response;
+  return api.delete(`/appointments/${appointmentId}`);
 }
 
-// For Insurance
+// Insurance
 export async function updateInsurance(insuranceData: {
   providerName: string;
   policyNumber: string;
   planType: string;
 }) {
-  // Suppose the backend allows PATCH /users/current or similar
-  const response = await api.patch('/users/current/insurance', {
+  // e.g. patching current_user
+  return api.patch('/users/current/insurance', {
     user: {
       provider_name: insuranceData.providerName,
       policy_number: insuranceData.policyNumber,
-      plan_type: insuranceData.planType
-    }
+      plan_type: insuranceData.planType,
+    },
   });
-  return response;
 }
 
-// For dependents
+// Dependents
 export async function getDependents() {
-  const response = await api.get('/dependents');
-  return response;
+  return api.get('/dependents');
 }
-export async function createDependent(data: { firstName: string; lastName: string; dateOfBirth: string; }) {
-  const response = await api.post('/dependents', { dependent: data });
-  return response;
+export async function createDependent(data: {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+}) {
+  return api.post('/dependents', { dependent: data });
 }
 export async function updateDependent(
   dependentId: number,
   data: { firstName: string; lastName: string; dateOfBirth: string }
 ) {
-  const response = await api.patch(`/dependents/${dependentId}`, { dependent: data });
-  return response;
+  return api.patch(`/dependents/${dependentId}`, { dependent: data });
 }
-
-// ...

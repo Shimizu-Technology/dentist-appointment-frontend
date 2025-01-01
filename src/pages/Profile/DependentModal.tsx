@@ -2,7 +2,9 @@ import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
-import type { Dependent } from '../../types';
+import { Dependent } from '../../types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createDependent, updateDependent } from '../../lib/api';
 
 interface DependentModalProps {
   isOpen: boolean;
@@ -17,22 +19,42 @@ interface FormData {
 }
 
 export default function DependentModal({ isOpen, onClose, dependent }: DependentModalProps) {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    defaultValues: dependent ? {
-      firstName: dependent.firstName,
-      lastName: dependent.lastName,
-      dateOfBirth: dependent.dateOfBirth.split('T')[0]
-    } : undefined
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    defaultValues: dependent
+      ? {
+          firstName: dependent.firstName,
+          lastName: dependent.lastName,
+          dateOfBirth: dependent.dateOfBirth.split('T')[0],
+        }
+      : undefined,
   });
 
-  const onSubmit = async (data: FormData) => {
-    try {
-      // TODO: Implement save/update logic
-      console.log('Save dependent:', data);
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (data: FormData) => {
+      if (dependent) {
+        // editing existing
+        return updateDependent(dependent.id, data);
+      } else {
+        // creating new
+        return createDependent(data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['dependents']);
       onClose();
-    } catch (error) {
-      console.error('Failed to save dependent:', error);
-    }
+    },
+    onError: (err: any) => {
+      alert(`Error saving dependent: ${err.message}`);
+    },
+  });
+
+  const onSubmit = (data: FormData) => {
+    mutation.mutate(data);
   };
 
   if (!isOpen) return null;

@@ -2,7 +2,9 @@ import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import Button from '../../../components/UI/Button';
 import Input from '../../../components/UI/Input';
-import type { AppointmentType } from '../../../types';
+import { AppointmentType } from '../../../types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createAppointmentType, updateAppointmentType } from '../../../lib/api';
 
 interface AppointmentTypeModalProps {
   isOpen: boolean;
@@ -21,22 +23,42 @@ export default function AppointmentTypeModal({
   onClose, 
   appointmentType 
 }: AppointmentTypeModalProps) {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    defaultValues: appointmentType ? {
-      name: appointmentType.name,
-      duration: appointmentType.duration,
-      description: appointmentType.description || ''
-    } : undefined
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    defaultValues: appointmentType
+      ? {
+          name: appointmentType.name,
+          duration: appointmentType.duration,
+          description: appointmentType.description || '',
+        }
+      : undefined,
   });
 
-  const onSubmit = async (data: FormData) => {
-    try {
-      // TODO: Implement save/update logic
-      console.log('Save appointment type:', data);
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (data: FormData) => {
+      if (appointmentType) {
+        // update existing
+        return updateAppointmentType(appointmentType.id, data);
+      } else {
+        // create new
+        return createAppointmentType(data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['appointment-types']);
       onClose();
-    } catch (error) {
-      console.error('Failed to save appointment type:', error);
-    }
+    },
+    onError: (err: any) => {
+      alert(`Error saving appointment type: ${err.message}`);
+    },
+  });
+
+  const onSubmit = (data: FormData) => {
+    mutation.mutate(data);
   };
 
   if (!isOpen) return null;
@@ -48,10 +70,7 @@ export default function AppointmentTypeModal({
           <h2 className="text-xl font-semibold text-gray-900">
             {appointmentType ? 'Edit' : 'Add'} Appointment Type
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -66,10 +85,10 @@ export default function AppointmentTypeModal({
           <Input
             type="number"
             label="Duration (minutes)"
-            {...register('duration', { 
+            {...register('duration', {
               required: 'Duration is required',
-              min: { value: 15, message: 'Minimum duration is 15 minutes' },
-              max: { value: 180, message: 'Maximum duration is 180 minutes' }
+              min: { value: 15, message: 'Minimum is 15' },
+              max: { value: 180, message: 'Maximum is 180' },
             })}
             error={errors.duration?.message}
           />
