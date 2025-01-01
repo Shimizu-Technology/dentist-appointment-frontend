@@ -71,10 +71,10 @@ export default function AppointmentsList() {
 
   // In-memory filter on the CURRENT page's appointments:
   const filteredAppointments = appointments.filter((appt) => {
-    const search       = searchTerm.toLowerCase().trim();
-    const userName     = (appt.userName || '').toLowerCase();
-    const userIdStr    = String(appt.userId);
-    const userEmail    = (appt.userEmail || '').toLowerCase();
+    const search = searchTerm.toLowerCase().trim();
+    const userName = (appt.userName || '').toLowerCase();
+    const userIdStr = String(appt.userId);
+    const userEmail = (appt.userEmail || '').toLowerCase();
 
     // Match if searchTerm is found in name, ID, or email
     const matchesNameIdEmail =
@@ -91,10 +91,17 @@ export default function AppointmentsList() {
       : true;
 
     // Filter date
-    const apptDate    = appt.appointmentTime?.split('T')[0] || '';
-    const matchesDate  = filterDate ? apptDate === filterDate : true;
+    const apptDate = appt.appointmentTime?.split('T')[0] || '';
+    const matchesDate = filterDate ? apptDate === filterDate : true;
 
     return matchesNameIdEmail && matchesDentist && matchesDate;
+  });
+
+  // Sort from earliest date to latest date
+  filteredAppointments.sort((a, b) => {
+    const dateA = new Date(a.appointmentTime).getTime();
+    const dateB = new Date(b.appointmentTime).getTime();
+    return dateA - dateB;
   });
 
   return (
@@ -111,8 +118,8 @@ export default function AppointmentsList() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none 
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full border border-gray-300 rounded-md px-3 py-2
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               placeholder='e.g. "Jane Doe", "15", or "user@example.com"'
             />
           </div>
@@ -126,8 +133,8 @@ export default function AppointmentsList() {
               type="text"
               value={filterDentist}
               onChange={(e) => setFilterDentist(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none 
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full border border-gray-300 rounded-md px-3 py-2
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               placeholder='e.g. "Mary Smith"'
             />
           </div>
@@ -141,8 +148,8 @@ export default function AppointmentsList() {
               type="date"
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full border border-gray-300 rounded-md px-3 py-2
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
           </div>
         </div>

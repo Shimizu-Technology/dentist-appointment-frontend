@@ -56,6 +56,13 @@ export default function AppointmentsList() {
   // Extract the array of appointments from the object
   const appointments = data?.appointments || [];
 
+  // Sort from earliest date to latest date
+  appointments.sort((a, b) => {
+    const dateA = new Date(a.appointmentTime).getTime();
+    const dateB = new Date(b.appointmentTime).getTime();
+    return dateA - dateB; // ascending
+  });
+
   if (!appointments.length) {
     return (
       <div className="text-center py-12 text-gray-600">
