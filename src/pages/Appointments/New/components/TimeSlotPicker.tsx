@@ -33,18 +33,16 @@ export default function TimeSlotPicker({
   const appointmentDuration = 30; // default to 30
 
   // Query the dentist’s availability
-  const { data: availabilityData = [] } = useQuery<Availability[]>(
-    ['dentist-availability', selectedDentistId],
-    async () => {
+  const { data: availabilityData = [] } = useQuery<Availability[]>({
+    queryKey: ['dentist-availability', selectedDentistId],
+    queryFn: async () => {
       if (!selectedDentistId) return [];
       const res = await getDentistAvailability(parseInt(selectedDentistId));
       return res.data;
     },
-    {
-      enabled: !!selectedDentistId,
-      initialData: [],
-    }
-  );
+    enabled: !!selectedDentistId,
+    initialData: [],
+  });
 
   useEffect(() => {
     // If any requirement not met, clear

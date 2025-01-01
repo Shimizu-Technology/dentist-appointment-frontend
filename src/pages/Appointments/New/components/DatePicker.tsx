@@ -25,20 +25,16 @@ export default function DatePicker({ register, error, watch }: DatePickerProps) 
   const selectedDentistId = watch('dentistId');
 
   // Query dentist availability from server
-  const { data: availabilityData = [] } = useQuery<Availability[]>(
-    ['dentist-availability', selectedDentistId],
-    async () => {
+  const { data: availabilityData = [] } = useQuery<Availability[]>({
+    queryKey: ['dentist-availability', selectedDentistId],
+    queryFn: async () => {
       if (!selectedDentistId) return [];
       const res = await getDentistAvailability(parseInt(selectedDentistId));
       return res.data; // array of availability
     },
-    {
-      // Only run if we have a selected dentist
-      enabled: !!selectedDentistId,
-      // Provide a default so TS knows it's an array
-      initialData: [],
-    }
-  );
+    enabled: !!selectedDentistId,  // Only run if we have a selected dentist
+    initialData: [],              // Provide a default so TS knows it's an array
+  });
 
   useEffect(() => {
     if (!selectedDentistId) {
