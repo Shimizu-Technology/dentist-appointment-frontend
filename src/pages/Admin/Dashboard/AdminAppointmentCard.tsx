@@ -1,5 +1,7 @@
 import { format } from 'date-fns';
 import { Calendar, Clock, User, Edit2, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { updateAppointment, cancelAppointment } from '../../../lib/api'; // <-- add
 import Button from '../../../components/UI/Button';
 import type { Appointment } from '../../../types';
 
@@ -14,14 +16,42 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     cancelled: 'bg-red-100 text-red-800'
   };
 
-  const handleReschedule = () => {
-    // TODO: Implement reschedule modal
-    console.log('Reschedule appointment:', appointment.id);
-  };
+  const queryClient = useQueryClient();
 
-  const handleCancel = () => {
-    // TODO: Implement cancel confirmation
-    console.log('Cancel appointment:', appointment.id);
+  // For the "Reschedule" action, let's do a naive approach:
+  // We can prompt for a date/time or open a modal. For now, let's do a simple window.prompt:
+  const handleReschedule = useMutation({
+    mutationFn: async (newTime: string) => {
+      // Convert newTime string -> e.g. '2024-05-04T10:00:00Z'
+      // In a real scenario, you'd parse it or let the user pick a date/time
+      return updateAppointment(appointment.id, {
+        appointmentTime: newTime,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-appointments']);
+    },
+    onError: (error: any) => {
+      alert(`Failed to reschedule: ${error.message}`);
+    },
+  });
+
+  // For Cancel:
+  const handleCancel = useMutation({
+    mutationFn: () => cancelAppointment(appointment.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-appointments']);
+    },
+    onError: (error: any) => {
+      alert(`Failed to cancel: ${error.message}`);
+    },
+  });
+
+  const doReschedule = () => {
+    const newDateTime = window.prompt('Enter new appointmentTime (YYYY-MM-DDTHH:mm:00Z)', appointment.appointmentTime);
+    if (newDateTime) {
+      handleReschedule.mutate(newDateTime);
+    }
   };
 
   return (
@@ -58,23 +88,29 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
       </div>
 
       <div className="flex space-x-4">
-        <Button
-          variant="outline"
-          onClick={handleReschedule}
-          className="flex items-center"
-        >
-          <Edit2 className="w-4 h-4 mr-2" />
-          Reschedule
-        </Button>
-        
-        <Button
-          variant="secondary"
-          onClick={handleCancel}
-          className="flex items-center text-red-600 hover:text-red-700"
-        >
-          <X className="w-4 h-4 mr-2" />
-          Cancel
-        </Button>
+        {appointment.status === 'scheduled' && (
+          <Button
+            variant="outline"
+            onClick={doReschedule}
+            className="flex items-center"
+            isLoading={handleReschedule.isPending}
+          >
+            <Edit2 className="w-4 h-4 mr-2" />
+            Reschedule
+          </Button>
+        )}
+
+        {appointment.status === 'scheduled' && (
+          <Button
+            variant="secondary"
+            onClick={() => handleCancel.mutate()}
+            className="flex items-center text-red-600 hover:text-red-700"
+            isLoading={handleCancel.isPending}
+          >
+            <X className="w-4 h-4 mr-2" />
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   );
