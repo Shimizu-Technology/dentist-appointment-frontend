@@ -1,4 +1,5 @@
 // File: /src/types/index.ts
+
 export interface User {
   id: number;
   email: string;
@@ -13,13 +14,35 @@ export interface User {
   };
 }
 
+export interface Dependent {
+  id: number;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppointmentType {
+  id: number;
+  name: string;
+  duration?: number;
+  description: string;
+}
+
+export interface Dentist {
+  id: number;
+  firstName: string;
+  lastName: string;
+  specialty: string | null;
+  imageUrl?: string;
+  qualifications?: string[];
+}
+
 export interface Appointment {
   id: number;
   userId: number;
-
-  user?: User;
-
-  dependentId?: number;
   dentistId: number;
   appointmentTypeId: number;
   appointmentTime: string;
@@ -28,19 +51,16 @@ export interface Appointment {
   updatedAt: string;
   notes?: string;
 
+  /** Populated from backend if included: */
+  user?: User;
+  dependentId?: number;
+  dependent?: Dependent;
+
+  /** Possibly included from the backend if you don’t include full user/dependent objects */
   userName?: string;
   userEmail?: string;
 
-  dentist?: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    specialty: string | null;
-  };
-  appointmentType?: {
-    id: number;
-    name: string;
-    duration?: number;
-    description: string;
-  };
+  /** For convenience, if included: */
+  dentist?: Dentist;
+  appointmentType?: AppointmentType;
 }
