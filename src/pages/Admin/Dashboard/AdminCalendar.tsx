@@ -17,13 +17,18 @@ import { getAppointments, updateAppointment } from '../../../lib/api';
 import type { Appointment } from '../../../types';
 import AdminAppointmentModal from './AdminAppointmentModal';
 
-/** 
- * Matches how your backend returns appointments in a paginated response:
- * {
- *   appointments: [...],
- *   meta: { currentPage, totalPages, ... }
- * }
+/**
+ * A small helper to snap durations to 15-minute increments:
+ * - e.g. 15 -> 15, 20 -> 30, 32 -> 45, 50 -> 60, etc.
  */
+function snapTo15(durationInMin: number) {
+  const remainder = durationInMin % 15;
+  if (remainder === 0) {
+    return durationInMin;
+  }
+  return durationInMin + (15 - remainder);
+}
+
 interface PaginatedAppointments {
   appointments: Appointment[];
   meta: {
@@ -42,60 +47,64 @@ export default function AdminCalendar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
 
-  // In “create” mode, we store the date/time that the admin clicked or selected
-  // so we can pre-fill the form
+  // For creating a new appointment (date/time preselected)
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
-  // Fetch a large chunk of appointments
+  // Fetch your appointments (200 for example)
   const { data, isLoading, error } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar'],
     queryFn: async () => {
-      // For demonstration, fetch 200 appointments on one page
       const response = await getAppointments(1, 200);
       return response.data;
     },
   });
 
-  // Convert each Appointment to a FullCalendar event
+  /**
+   * Convert each Appointment to a FullCalendar event.
+   * We use the appointment_type.duration (if available), or default to 60.
+   * Then we “snap” that duration to 15-minute increments if you want to show partial blocks
+   * or rounding. If you want EXACT partial times, do not snap, just use the real duration.
+   */
   const appointments = data?.appointments || [];
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    // If you have a known duration, compute end. For now, assume +1 hour:
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+    // 1) Get the “real” duration from the DB. If undefined, default 60.
+    const rawDuration = appt.appointmentType?.duration ?? 60;
+
+    // 2) If you want strict rounding:
+    const snappedDuration = snapTo15(rawDuration);
+
+    // 3) End time = start + snappedDuration
+    const end = new Date(start.getTime() + snappedDuration * 60_000);
 
     return {
       id: String(appt.id),
       title: appt.appointmentType?.name
         ? `${appt.appointmentType.name} (#${appt.id})`
-        : `Appointment #${appt.id}`,
+        : `Appt #${appt.id}`,
       start,
       end,
-      // Store entire Appointment in extendedProps
       extendedProps: { appointment: appt },
     };
   });
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────
   // FULLCALENDAR EVENT HANDLERS
-  // ──────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────
 
-  // Called when user drags or clicks an empty slot (if `selectable=true`)
   const handleSelect = useCallback((info: SelectArg) => {
-    setEditingAppointment(null);        // New appointment, no existing data
-    setCreateDate(info.start);          // Start date/time
+    setEditingAppointment(null); 
+    setCreateDate(info.start);
     setIsModalOpen(true);
-    // info.view.calendar.unselect() if you want to remove highlight
   }, []);
 
-  // Called when user single-clicks an empty slot (if `dateClick` is used).
-  // If you prefer only drag-select, you can remove this or replicate logic:
   const handleDateClick = useCallback((arg: DateClickArg) => {
     setEditingAppointment(null);
     setCreateDate(arg.date);
     setIsModalOpen(true);
   }, []);
 
-  // Called when user clicks on an existing event
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
     if (appt) {
@@ -105,23 +114,25 @@ export default function AdminCalendar() {
     }
   }, []);
 
-  // Called when user drags an existing event to a new time
   const handleEventDrop = useCallback(
     async (dropInfo: EventDropArg) => {
       const { event } = dropInfo;
       const newStart = event.start;
       const oldAppt = event.extendedProps.appointment as Appointment;
+
       if (!oldAppt || !newStart) {
         dropInfo.revert();
         return;
       }
-      const confirmMove = window.confirm(
+
+      const yes = window.confirm(
         `Move appointment #${oldAppt.id} to ${newStart.toLocaleString()}?`
       );
-      if (!confirmMove) {
+      if (!yes) {
         dropInfo.revert();
         return;
       }
+
       try {
         await updateAppointment(oldAppt.id, {
           appointment_time: newStart.toISOString(),
@@ -135,9 +146,9 @@ export default function AdminCalendar() {
     [queryClient]
   );
 
-  // Called if you allow event resizing from the bottom edge
+  // If you allow resizing in the calendar, handle it similarly:
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // Example: revert always. Or handle similarly to handleEventDrop
+    // e.g. confirm or revert
     resizeInfo.revert();
   }, []);
 
@@ -145,9 +156,9 @@ export default function AdminCalendar() {
   if (isLoading) return <div className="py-6 text-center">Loading calendar...</div>;
   if (error) return <div className="py-6 text-red-600 text-center">Failed to load appointments.</div>;
 
-  // Optional: date nav
-  const goNext = () => calendarRef.current?.getApi().next();
+  // Optional date nav
   const goPrev = () => calendarRef.current?.getApi().prev();
+  const goNext = () => calendarRef.current?.getApi().next();
 
   return (
     <div>
@@ -171,11 +182,18 @@ export default function AdminCalendar() {
         editable={true}
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
+
+        // Here are the slot settings to show partial blocks
+        // every 15 minutes (snap to 15 but label every 30):
+        slotDuration="00:15:00"
+        slotLabelInterval="00:30:00"
+        snapDuration="00:15:00"
+
         events={events}
         height="auto"
       />
 
-      {/* Our combined create/edit modal */}
+      {/* Combined create/edit modal */}
       <AdminAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
