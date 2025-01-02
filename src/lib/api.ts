@@ -1,9 +1,10 @@
+// src/lib/api.ts
 import axios from 'axios';
 
 // Decide which base URL to use, depending on environment (dev or prod)
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
-  : import.meta.env.VITE_LOCAL_API_BASE_URL
+  : import.meta.env.VITE_LOCAL_API_BASE_URL;
 
 // Create axios instance
 const api = axios.create({
@@ -37,6 +38,18 @@ export async function signup(
       first_name: firstName,
       last_name: lastName,
     },
+  });
+}
+
+// -- NEW: Update current user profile
+export async function updateCurrentUser(data: {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+}) {
+  return api.patch('/users/current', {
+    user: data,
   });
 }
 

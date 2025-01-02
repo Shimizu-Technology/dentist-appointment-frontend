@@ -1,3 +1,4 @@
+// src/pages/Profile/ProfileHeader.tsx
 import { UserCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
