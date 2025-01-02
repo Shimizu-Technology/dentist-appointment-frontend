@@ -23,7 +23,6 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
   const { user, setAuth } = useAuthStore();
   const queryClient = useQueryClient();
 
-  // react-hook-form setup, pre-fill with current user data
   const {
     register,
     handleSubmit,
@@ -38,15 +37,23 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     },
   });
 
-  // mutation: calls updateCurrentUser
+  // Here's where we fix the param names before passing them to updateCurrentUser().
   const mutation = useMutation({
-    mutationFn: (data: ProfileFormData) => updateCurrentUser(data),
+    mutationFn: (data: ProfileFormData) => {
+      // Convert camelCase to snake_case
+      const payload = {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email,
+        phone: data.phone,
+      };
+      return updateCurrentUser(payload);
+    },
     onSuccess: (response) => {
-      // response.data is the updated user object
+      // The server returns the updated user object in response.data
       const updatedUser = response.data;
       setAuth(updatedUser, localStorage.getItem('token') || '');
-      // optionally re-fetch queries if needed
-      queryClient.invalidateQueries(['user']); 
+      queryClient.invalidateQueries(['user']);
       onClose();
     },
     onError: (err: any) => {
@@ -54,11 +61,10 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     },
   });
 
-  const onSubmit = (data: ProfileFormData) => {
-    mutation.mutate(data);
+  const onSubmit = (formData: ProfileFormData) => {
+    mutation.mutate(formData);
   };
 
-  // If not open, don't render anything
   if (!isOpen) return null;
 
   return (
@@ -75,7 +81,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
           </button>
         </div>
 
-        {/* Form Body */}
+        {/* Body */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <Input
             label="First Name"
