@@ -4,6 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../../lib/api';
 import AdminAppointmentCard from './AdminAppointmentCard';
 import type { Appointment } from '../../../types';
+import Button from '../../../components/UI/Button';
+import { Plus } from 'lucide-react';
+import AdminAppointmentModal from './AdminAppointmentModal';
 
 interface PaginatedAppointments {
   appointments: Appointment[];
@@ -23,6 +26,9 @@ export default function AppointmentsList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDentist, setFilterDentist] = useState('');
   const [filterDate, setFilterDate] = useState('');
+
+  // Track if “New Appointment” modal is open
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Smoothly scroll to top whenever `page` changes.
   useEffect(() => {
@@ -90,7 +96,7 @@ export default function AppointmentsList() {
       ? dentistName.includes(filterDentist.toLowerCase())
       : true;
 
-    // Filter date
+    // Filter by date
     const apptDate = appt.appointmentTime?.split('T')[0] || '';
     const matchesDate = filterDate ? apptDate === filterDate : true;
 
@@ -101,7 +107,7 @@ export default function AppointmentsList() {
   filteredAppointments.sort((a, b) => {
     const dateA = new Date(a.appointmentTime).getTime();
     const dateB = new Date(b.appointmentTime).getTime();
-    return dateA - dateB;
+    return dateA - dateB; // ascending
   });
 
   return (
@@ -155,6 +161,14 @@ export default function AppointmentsList() {
         </div>
       </div>
 
+      {/* "New Appointment" button for Admin */}
+      <div className="text-right">
+        <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center">
+          <Plus className="w-5 h-5 mr-2" />
+          New Appointment
+        </Button>
+      </div>
+
       {/* Filtered results */}
       {filteredAppointments.length > 0 ? (
         filteredAppointments.map((appt) => (
@@ -196,6 +210,13 @@ export default function AppointmentsList() {
       {isFetching && (
         <div className="text-center text-sm text-gray-500">Loading...</div>
       )}
+
+      {/* The create appointment modal */}
+      <AdminAppointmentModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        editingAppointment={null}
+      />
     </div>
   );
 }

@@ -10,8 +10,10 @@ const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
   : import.meta.env.VITE_LOCAL_API_BASE_URL;
 
-// Create an axios instance for our API
-const api = axios.create({
+/**
+ * 1) Export the axios instance by name: `api`
+ */
+export const api = axios.create({
   baseURL,
 });
 
@@ -132,7 +134,7 @@ export async function getAppointments(page?: number, perPage?: number) {
 }
 
 export async function createAppointment(data: any) {
-  // For your Rails backend, you must wrap it in { appointment: { ... } }
+  // Must wrap in { appointment: {...} } for Rails
   return api.post('/appointments', { appointment: data });
 }
 
@@ -175,9 +177,7 @@ export async function updateInsurance(insuranceData: {
   policyNumber: string;
   planType: string;
 }) {
-  // Patch /users/current/insurance is one approach; your code uses /users/current
-  // so you might pass the insurance fields as part of user object.
-  // Adjust as needed if your backend is different.
+  // Adjust as needed for your backend route
   return api.patch('/users/current', {
     user: {
       provider_name: insuranceData.providerName,
