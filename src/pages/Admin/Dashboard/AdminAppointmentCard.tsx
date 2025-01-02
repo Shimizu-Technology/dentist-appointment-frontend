@@ -56,6 +56,12 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     }
   };
 
+  const onCancelClick = () => {
+    const yes = window.confirm('Are you sure you want to cancel this appointment?');
+    if (!yes) return;
+    handleCancel.mutate();
+  };
+
   // Safely parse the date/time
   let parsedDate: Date | null = null;
   try {
@@ -131,7 +137,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
         {appointment.status === 'scheduled' && (
           <Button
             variant="secondary"
-            onClick={() => handleCancel.mutate()}
+            onClick={onCancelClick}
             className="flex items-center text-red-600 hover:text-red-700"
             isLoading={handleCancel.isPending}
           >

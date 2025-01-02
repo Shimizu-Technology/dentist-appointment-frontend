@@ -16,27 +16,29 @@ export default function AppointmentActions({ appointment, onEdit }: AppointmentA
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-    }
+    },
   });
 
   if (!canManageAppointment(appointment)) {
     return null;
   }
 
+  const onCancelClick = () => {
+    const yes = window.confirm('Are you sure you want to cancel this appointment?');
+    if (!yes) return;
+    handleCancel();
+  };
+
   return (
     <div className="flex space-x-4">
-      <Button
-        variant="outline"
-        onClick={onEdit}
-        className="flex items-center"
-      >
+      <Button variant="outline" onClick={onEdit} className="flex items-center">
         <Edit2 className="w-4 h-4 mr-2" />
         Reschedule
       </Button>
-      
+
       <Button
         variant="secondary"
-        onClick={() => handleCancel()}
+        onClick={onCancelClick}
         isLoading={isCancelling}
         className="flex items-center text-red-600 hover:text-red-700"
       >

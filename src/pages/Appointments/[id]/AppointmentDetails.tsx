@@ -42,6 +42,11 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
     parsedDate = null;
   }
 
+  const onCancelClick = () => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+    handleCancel();
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-8">
       <div className="flex justify-between items-start mb-8">
@@ -65,7 +70,7 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
             </Button>
             <Button
               variant="secondary"
-              onClick={() => handleCancel()}
+              onClick={onCancelClick}
               isLoading={isCancelling}
               className="flex items-center text-red-600 hover:text-red-700"
             >
