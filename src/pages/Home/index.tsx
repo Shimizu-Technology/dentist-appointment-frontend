@@ -11,7 +11,6 @@ export default function Home() {
       <ServicesOverview />
       <DoctorsPreview />
       <ContactSection />
-      <Footer />
     </div>
   );
 }

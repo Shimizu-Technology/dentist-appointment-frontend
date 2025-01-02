@@ -13,7 +13,6 @@ export default function Contact() {
           <ContactInfo />
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

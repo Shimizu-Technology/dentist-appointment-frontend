@@ -72,7 +72,6 @@ export default function AppointmentEdit() {
           onSuccess={() => navigate(`/appointments/${id}`)}
         />
       </div>
-      <Footer />
     </div>
   );
 }

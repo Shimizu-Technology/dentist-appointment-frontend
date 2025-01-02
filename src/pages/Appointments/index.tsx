@@ -13,7 +13,6 @@ export default function Appointments() {
         </div>
         <AppointmentsList />
       </div>
-      <Footer />
     </div>
   );
 }

@@ -37,10 +37,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     },
   });
 
-  // Here's where we fix the param names before passing them to updateCurrentUser().
+  // We’ll transform to snake_case before sending to the API
   const mutation = useMutation({
     mutationFn: (data: ProfileFormData) => {
-      // Convert camelCase to snake_case
       const payload = {
         first_name: data.firstName,
         last_name: data.lastName,
@@ -50,7 +49,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       return updateCurrentUser(payload);
     },
     onSuccess: (response) => {
-      // The server returns the updated user object in response.data
+      // Updated user object from the server
       const updatedUser = response.data;
       setAuth(updatedUser, localStorage.getItem('token') || '');
       queryClient.invalidateQueries(['user']);
@@ -72,59 +71,68 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">Edit Profile</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
-          >
+          <h2 className="text-xl font-semibold text-gray-900">
+            Update Your Profile
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body */}
+        {/* Form Body */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-          <Input
-            label="First Name"
-            {...register('firstName', {
-              required: 'First name is required',
-            })}
-            error={errors.firstName?.message}
-          />
+          {/* Name Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="First Name"
+              {...register('firstName', {
+                required: 'First name is required',
+              })}
+              error={errors.firstName?.message}
+            />
 
-          <Input
-            label="Last Name"
-            {...register('lastName', {
-              required: 'Last name is required',
-            })}
-            error={errors.lastName?.message}
-          />
+            <Input
+              label="Last Name"
+              {...register('lastName', {
+                required: 'Last name is required',
+              })}
+              error={errors.lastName?.message}
+            />
+          </div>
 
-          <Input
-            label="Email"
-            type="email"
-            {...register('email', {
-              required: 'Email is required',
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: 'Invalid email address',
-              },
-            })}
-            error={errors.email?.message}
-          />
+          {/* Contact Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Email"
+              type="email"
+              {...register('email', {
+                required: 'Email is required',
+                pattern: {
+                  value: /^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$/i,
+                  message: 'Invalid email address',
+                },
+              })}
+              error={errors.email?.message}
+            />
 
-          <Input
-            label="Phone"
-            type="tel"
-            {...register('phone', {
-              pattern: {
-                value: /^\+?[\d\s-]+$/,
-                message: 'Invalid phone number',
-              },
-            })}
-            error={errors.phone?.message}
-          />
+            <Input
+              label="Phone"
+              type="tel"
+              {...register('phone', {
+                pattern: {
+                  value: /^\+?[\d\s-]+$/,
+                  message: 'Invalid phone number',
+                },
+              })}
+              error={errors.phone?.message}
+            />
+          </div>
 
-          {/* Footer */}
+          <p className="text-sm text-gray-500">
+            We only use your phone number to confirm appointments or notify you in case of changes.
+          </p>
+
+          {/* Form Footer */}
           <div className="flex justify-end space-x-4 pt-4">
             <Button
               type="button"
