@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Decide which base URL to use, depending on environment (dev or prod)
 const baseURL = import.meta.env.PROD
-  ? import.meta.env.PROD_API_BASE_URL
-  : import.meta.env.LOCAL_API_BASE_URL
+  ? import.meta.env.VITE_PROD_API_BASE_URL
+  : import.meta.env.VITE_LOCAL_API_BASE_URL
 
 // Create axios instance
 const api = axios.create({
