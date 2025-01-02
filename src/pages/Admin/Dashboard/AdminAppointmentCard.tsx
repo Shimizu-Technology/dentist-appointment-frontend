@@ -1,3 +1,5 @@
+// File: /src/pages/Admin/Dashboard/AdminAppointmentCard.tsx
+
 import { format } from 'date-fns';
 import { Calendar, Clock, User, Edit2, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,20 +12,20 @@ interface AdminAppointmentCardProps {
 }
 
 export default function AdminAppointmentCard({ appointment }: AdminAppointmentCardProps) {
-  const statusColors = {
+  const queryClient = useQueryClient();
+
+  // Display a color-coded badge for appointment status
+  const statusColors: Record<string, string> = {
     scheduled: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
   };
 
-  const queryClient = useQueryClient();
-
-  // "Reschedule" action (naive approach with a prompt)
+  // Reschedule mutation (naive approach with a prompt)
   const handleReschedule = useMutation({
     mutationFn: async (newTime: string) => {
-      // Convert newTime string -> e.g. '2025-02-04T10:00:00Z'
       return updateAppointment(appointment.id, {
-        appointmentTime: newTime,
+        appointment_time: newTime,
       });
     },
     onSuccess: () => {
@@ -34,7 +36,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
-  // "Cancel" action
+  // Cancel mutation
   const handleCancel = useMutation({
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
@@ -45,15 +47,13 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
-  // Prompt user for new date/time
   const doReschedule = () => {
     const newDateTime = window.prompt(
-      'Enter new appointmentTime (YYYY-MM-DDTHH:mm:00Z)',
+      'Enter new appointment_time (YYYY-MM-DDTHH:mm:00Z)',
       appointment.appointmentTime
     );
-    if (newDateTime) {
-      handleReschedule.mutate(newDateTime);
-    }
+    if (!newDateTime) return;
+    handleReschedule.mutate(newDateTime);
   };
 
   const onCancelClick = () => {
@@ -75,27 +75,33 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
+      {/* Header row: type + status badge */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
             {appointment.appointmentType?.name || 'Appointment'}
           </h3>
+          {/* Show user’s name + email if the user object is present */}
           <p className="text-sm text-gray-500">
-            {appointment.userName
-              ? `Patient: ${appointment.userName}`
-              : `Patient ID: ${appointment.userId}`
+            {appointment.user
+              ? `Patient: ${appointment.user.firstName} ${appointment.user.lastName} (${appointment.user.email})`
+              : appointment.userName
+                ? `Patient: ${appointment.userName} (${appointment.userEmail ?? 'No email'})`
+                : `Patient ID: ${appointment.userId}`
             }
           </p>
         </div>
         <span
-          className={`px-3 py-1 rounded-full text-sm font-medium ${
-            statusColors[appointment.status] || ''
-          }`}
+          className={[
+            'px-3 py-1 rounded-full text-sm font-medium',
+            statusColors[appointment.status] || '',
+          ].join(' ')}
         >
           {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
         </span>
       </div>
 
+      {/* Body: date/time + dentist */}
       <div className="space-y-3 mb-6">
         {parsedDate ? (
           <>
@@ -103,7 +109,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
               <Calendar className="w-5 h-5 mr-2" />
               {format(parsedDate, 'MMMM d, yyyy')}
             </div>
-
             <div className="flex items-center text-gray-600">
               <Clock className="w-5 h-5 mr-2" />
               {format(parsedDate, 'h:mm a')}
@@ -113,6 +118,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           <p className="text-sm text-red-500">Invalid date/time</p>
         )}
 
+        {/* Dentist info */}
         {appointment.dentist && (
           <div className="flex items-center text-gray-600">
             <User className="w-5 h-5 mr-2" />
@@ -121,6 +127,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
         )}
       </div>
 
+      {/* Actions row */}
       <div className="flex space-x-4">
         {appointment.status === 'scheduled' && (
           <Button
@@ -133,7 +140,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
             Reschedule
           </Button>
         )}
-
         {appointment.status === 'scheduled' && (
           <Button
             variant="secondary"

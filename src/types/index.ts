@@ -1,9 +1,11 @@
+// File: /src/types/index.ts
 export interface User {
   id: number;
   email: string;
   role: 'user' | 'admin';
   firstName: string;
   lastName: string;
+  phone?: string;
   insuranceInfo?: {
     providerName: string;
     policyNumber: string;
@@ -11,54 +13,34 @@ export interface User {
   };
 }
 
-export interface Dependent {
-  id: number;
-  userId: number;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Dentist {
-  id: number;
-  firstName: string;
-  lastName: string;
-  specialty: 'general' | 'pediatric';
-  imageUrl: string;
-  qualifications: string[];
-}
-
-export interface AppointmentType {
-  id: number;
-  name: string;
-  duration: number;
-  description: string;
-}
-
 export interface Appointment {
   id: number;
   userId: number;
+
+  user?: User;
+
+  dependentId?: number;
   dentistId: number;
   appointmentTypeId: number;
   appointmentTime: string;
   status: 'scheduled' | 'completed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
-  dentist?: Dentist;
-  appointmentType?: AppointmentType;
-}
+  notes?: string;
 
-export interface DentistAvailability {
-  dentistId: number;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-}
+  userName?: string;
+  userEmail?: string;
 
-export interface BlockedTime {
-  dentistId: number;
-  date: string;
-  reason: string;
+  dentist?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    specialty: string | null;
+  };
+  appointmentType?: {
+    id: number;
+    name: string;
+    duration?: number;
+    description: string;
+  };
 }

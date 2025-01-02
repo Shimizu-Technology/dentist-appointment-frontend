@@ -1,18 +1,21 @@
-// File: src/lib/api.ts
+// File: /src/lib/api.ts
 
 import axios from 'axios';
 
-// Decide which base URL to use, depending on environment (dev or prod).
+/**
+ * Determine which base URL to use
+ * (Development vs. Production).
+ */
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
   : import.meta.env.VITE_LOCAL_API_BASE_URL;
 
-// Create axios instance
+// Create an axios instance for our API
 const api = axios.create({
   baseURL,
 });
 
-// Interceptor to attach token
+// Interceptor to attach token from localStorage
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token && config.headers) {
@@ -21,22 +24,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AUTH
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Log a user in. Returns a JWT plus user info on success.
- * @param email
- * @param password
+ * LOGIN / SESSIONS
  */
 export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
 
 /**
- * Sign up a new user. If the current user is admin and `role === 'admin'` is passed,
- * the new user can be created as an admin. Otherwise, defaults to 'user'.
+ * SIGNUP
  */
 export async function signup(
   email: string,
@@ -45,82 +41,67 @@ export async function signup(
   lastName: string,
   role?: string
 ) {
+  // “role” only works if the current user is admin (per your backend’s logic).
   return api.post('/users', {
     user: {
       email,
       password,
       first_name: firstName,
       last_name: lastName,
-      role, // can be 'admin' if the current user is already admin
+      role,
     },
   });
 }
 
 /**
- * Update the currently logged-in user's profile (firstName, lastName, phone, email).
+ * Update the current logged-in user
  */
 export async function updateCurrentUser(data: {
-  firstName?: string;
-  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
   email?: string;
 }) {
+  // PATCH /api/v1/users/current
   return api.patch('/users/current', {
     user: data,
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN FEATURES: Users
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Get a paginated list of all users (admin-only).
- * @param page - which page to fetch
- * @param perPage - how many items per page
+ * GET Users (Admin-only)
  */
 export async function getUsers(page = 1, perPage = 10) {
   return api.get('/users', {
-    params: {
-      page,
-      per_page: perPage,
-    },
+    params: { page, per_page: perPage },
   });
 }
 
 /**
- * Promote a user (by ID) to admin role (admin-only).
+ * Promote user to admin (Admin-only)
  */
 export async function promoteUser(userId: number) {
   return api.patch(`/users/${userId}/promote`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DENTISTS
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Fetch all dentists (public).
+ * DENTISTS
  */
 export async function getDentists() {
   return api.get('/dentists');
 }
 
-/**
- * Fetch availability for a specific dentist.
- */
 export async function getDentistAvailability(dentistId: number) {
+  // GET /dentists/:id/availabilities
   return api.get(`/dentists/${dentistId}/availabilities`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// APPOINTMENT TYPES
-// ─────────────────────────────────────────────────────────────────────────────
-
+/**
+ * APPOINTMENT TYPES
+ */
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
-
 export async function createAppointmentType(data: {
   name: string;
   duration: number;
@@ -128,26 +109,18 @@ export async function createAppointmentType(data: {
 }) {
   return api.post('/appointment_types', { appointment_type: data });
 }
-
 export async function updateAppointmentType(
   id: number,
   data: { name: string; duration: number; description: string }
 ) {
   return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
-
 export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// APPOINTMENTS
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Get appointments. If admin, returns all; if regular user, returns own.
- * @param page - optional
- * @param perPage - optional
+ * APPOINTMENTS
  */
 export async function getAppointments(page?: number, perPage?: number) {
   return api.get('/appointments', {
@@ -159,6 +132,7 @@ export async function getAppointments(page?: number, perPage?: number) {
 }
 
 export async function createAppointment(data: any) {
+  // For your Rails backend, you must wrap it in { appointment: { ... } }
   return api.post('/appointments', { appointment: data });
 }
 
@@ -167,31 +141,13 @@ export async function updateAppointment(appointmentId: number, data: any) {
 }
 
 export async function cancelAppointment(appointmentId: number) {
+  // Your backend does a full DELETE to remove the appointment
   return api.delete(`/appointments/${appointmentId}`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INSURANCE
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function updateInsurance(insuranceData: {
-  providerName: string;
-  policyNumber: string;
-  planType: string;
-}) {
-  return api.patch('/users/current/insurance', {
-    user: {
-      provider_name: insuranceData.providerName,
-      policy_number: insuranceData.policyNumber,
-      plan_type: insuranceData.planType,
-    },
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DEPENDENTS
-// ─────────────────────────────────────────────────────────────────────────────
-
+/**
+ * DEPENDENTS
+ */
 export async function getDependents() {
   return api.get('/dependents');
 }
@@ -209,4 +165,24 @@ export async function updateDependent(
   data: { firstName: string; lastName: string; dateOfBirth: string }
 ) {
   return api.patch(`/dependents/${dependentId}`, { dependent: data });
+}
+
+/**
+ * INSURANCE
+ */
+export async function updateInsurance(insuranceData: {
+  providerName: string;
+  policyNumber: string;
+  planType: string;
+}) {
+  // Patch /users/current/insurance is one approach; your code uses /users/current
+  // so you might pass the insurance fields as part of user object.
+  // Adjust as needed if your backend is different.
+  return api.patch('/users/current', {
+    user: {
+      provider_name: insuranceData.providerName,
+      policy_number: insuranceData.policyNumber,
+      plan_type: insuranceData.planType,
+    },
+  });
 }
