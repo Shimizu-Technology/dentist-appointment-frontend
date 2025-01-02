@@ -1,28 +1,30 @@
+// File: /src/components/UI/Tabs.tsx
+import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react';
+
+interface TabsContextValue {
+  value: string;
+  setValue: Dispatch<SetStateAction<string>>;
+}
+
+const TabsContext = createContext<TabsContextValue | undefined>(undefined);
+
 interface TabsProps {
   defaultValue: string;
-  children: React.ReactNode;
-}
-
-interface TabsListProps {
-  children: React.ReactNode;
-}
-
-interface TabsTriggerProps {
-  value: string;
-  children: React.ReactNode;
-}
-
-interface TabsContentProps {
-  value: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function Tabs({ defaultValue, children }: TabsProps) {
+  const [value, setValue] = useState(defaultValue);
+
   return (
-    <div className="w-full">
-      {children}
-    </div>
+    <TabsContext.Provider value={{ value, setValue }}>
+      <div className="w-full">{children}</div>
+    </TabsContext.Provider>
   );
+}
+
+interface TabsListProps {
+  children: ReactNode;
 }
 
 export function TabsList({ children }: TabsListProps) {
@@ -33,20 +35,52 @@ export function TabsList({ children }: TabsListProps) {
   );
 }
 
+interface TabsTriggerProps {
+  value: string;       // Unique identifier for which tab this trigger corresponds to
+  children: ReactNode;
+}
+
 export function TabsTrigger({ value, children }: TabsTriggerProps) {
+  const ctx = useContext(TabsContext);
+  if (!ctx) {
+    throw new Error('TabsTrigger must be used inside a <Tabs> component');
+  }
+
+  const { value: activeValue, setValue } = ctx;
+  const isActive = activeValue === value;
+
   return (
     <button
-      className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap pb-4 border-b-2 border-transparent hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-blue-500"
+      onClick={() => setValue(value)}
+      className={`
+        px-4 py-2 text-sm font-medium whitespace-nowrap pb-4 border-b-2 focus:outline-none
+        ${
+          isActive
+            ? 'text-gray-700 border-blue-500'
+            : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+        }
+      `}
     >
       {children}
     </button>
   );
 }
 
+interface TabsContentProps {
+  value: string;       // The same identifier used by TabsTrigger to match
+  children: ReactNode;
+}
+
 export function TabsContent({ value, children }: TabsContentProps) {
-  return (
-    <div className="mt-4">
-      {children}
-    </div>
-  );
+  const ctx = useContext(TabsContext);
+  if (!ctx) {
+    throw new Error('TabsContent must be used inside a <Tabs> component');
+  }
+
+  const { value: activeValue } = ctx;
+
+  // Only render children if this tab's value matches the active tab
+  if (activeValue !== value) return null;
+
+  return <div className="mt-4">{children}</div>;
 }
