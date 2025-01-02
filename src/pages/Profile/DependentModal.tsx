@@ -22,8 +22,9 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
   } = useForm<FormData>({
+    mode: 'onChange',
     defaultValues: dependent
       ? {
           firstName: dependent.firstName,
@@ -95,7 +96,11 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" isLoading={isSubmitting}>
+            <Button
+              type="submit"
+              isLoading={mutation.isLoading || isSubmitting}
+              disabled={mutation.isLoading || isSubmitting || !isValid}
+            >
               {dependent ? 'Update' : 'Add'} Dependent
             </Button>
           </div>

@@ -1,4 +1,3 @@
-// src/pages/Admin/Dashboard/AppointmentTypeModal.tsx
 import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import Button from '../../../components/UI/Button';
@@ -26,12 +25,12 @@ export default function AppointmentTypeModal({
 }: AppointmentTypeModalProps) {
   const queryClient = useQueryClient();
 
-  // If we have an existing AppointmentType, pre-populate the form with those fields
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
   } = useForm<FormData>({
+    mode: 'onChange',
     defaultValues: appointmentType
       ? {
           name: appointmentType.name,
@@ -52,7 +51,6 @@ export default function AppointmentTypeModal({
       }
     },
     onSuccess: () => {
-      // Refresh the list
       queryClient.invalidateQueries(['appointment-types']);
       onClose();
     },
@@ -116,7 +114,11 @@ export default function AppointmentTypeModal({
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" isLoading={isSubmitting}>
+            <Button
+              type="submit"
+              isLoading={mutation.isLoading || isSubmitting}
+              disabled={mutation.isLoading || isSubmitting || !isValid}
+            >
               {appointmentType ? 'Update' : 'Create'}
             </Button>
           </div>

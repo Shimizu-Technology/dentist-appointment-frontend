@@ -19,8 +19,10 @@ export default function SignupForm() {
     handleSubmit,
     watch,
     setError,
-    formState: { errors, isSubmitting },
-  } = useForm<SignupFormData>();
+    formState: { errors, isSubmitting, isValid },
+  } = useForm<SignupFormData>({
+    mode: 'onChange', // validate on every change
+  });
 
   const onSubmit = async (data: SignupFormData) => {
     const result = await signup(
@@ -90,7 +92,12 @@ export default function SignupForm() {
         <p className="text-red-600 text-sm">{errors.root.message}</p>
       )}
 
-      <Button type="submit" isLoading={isSubmitting} className="w-full">
+      <Button
+        type="submit"
+        isLoading={isSubmitting}
+        disabled={isSubmitting || !isValid}
+        className="w-full"
+      >
         Create Account
       </Button>
 

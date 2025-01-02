@@ -21,15 +21,20 @@ interface InsuranceFormProps {
 export default function InsuranceForm({ currentInfo, onSuccess }: InsuranceFormProps) {
   const { updateInsurance, isUpdating } = useInsurance();
   
-  const { register, handleSubmit, formState: { errors } } = useForm<InsuranceFormData>({
-    defaultValues: currentInfo
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm<InsuranceFormData>({
+    mode: 'onChange',
+    defaultValues: currentInfo,
   });
 
   const onSubmit = async (data: InsuranceFormData) => {
     updateInsurance(data, {
       onSuccess: () => {
         onSuccess?.();
-      }
+      },
     });
   };
 
@@ -54,7 +59,12 @@ export default function InsuranceForm({ currentInfo, onSuccess }: InsuranceFormP
         error={errors.planType?.message}
       />
 
-      <Button type="submit" isLoading={isUpdating} className="w-full">
+      <Button
+        type="submit"
+        isLoading={isUpdating}
+        disabled={isUpdating || !isValid}
+        className="w-full"
+      >
         Save Insurance Information
       </Button>
     </form>

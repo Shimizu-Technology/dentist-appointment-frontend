@@ -13,8 +13,10 @@ export default function ContactForm() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting }
-  } = useForm<ContactFormData>();
+    formState: { errors, isSubmitting, isValid },
+  } = useForm<ContactFormData>({
+    mode: 'onChange',
+  });
 
   const onSubmit = async (data: ContactFormData) => {
     // TODO: Implement contact form submission
@@ -38,8 +40,8 @@ export default function ContactForm() {
             required: 'Email is required',
             pattern: {
               value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-              message: 'Invalid email address'
-            }
+              message: 'Invalid email address',
+            },
           })}
           error={errors.email?.message}
         />
@@ -51,8 +53,8 @@ export default function ContactForm() {
             required: 'Phone number is required',
             pattern: {
               value: /^\+?[\d\s-]+$/,
-              message: 'Invalid phone number'
-            }
+              message: 'Invalid phone number',
+            },
           })}
           error={errors.phone?.message}
         />
@@ -75,7 +77,12 @@ export default function ContactForm() {
           )}
         </div>
 
-        <Button type="submit" isLoading={isSubmitting} className="w-full">
+        <Button
+          type="submit"
+          isLoading={isSubmitting}
+          disabled={isSubmitting || !isValid}
+          className="w-full"
+        >
           Send Message
         </Button>
       </form>

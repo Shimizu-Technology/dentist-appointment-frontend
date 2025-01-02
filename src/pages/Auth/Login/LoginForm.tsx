@@ -15,8 +15,10 @@ export default function LoginForm() {
     register,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormData>();
+    formState: { errors, isSubmitting, isValid },
+  } = useForm<LoginFormData>({
+    mode: 'onChange',
+  });
 
   const onSubmit = async (data: LoginFormData) => {
     const result = await login(data.email, data.password);
@@ -57,7 +59,12 @@ export default function LoginForm() {
         <p className="text-red-600 text-sm">{errors.root.message}</p>
       )}
 
-      <Button type="submit" isLoading={isSubmitting} className="w-full">
+      <Button
+        type="submit"
+        isLoading={isSubmitting}
+        disabled={isSubmitting || !isValid}
+        className="w-full"
+      >
         Sign In
       </Button>
 

@@ -37,22 +37,23 @@ export default function NewAppointmentForm({ appointment, onSuccess }: NewAppoin
           minute: '2-digit',
           hour12: false,
         }),
+        notes: appointment.notes || '',
       }
-    : undefined;
+    : {};
 
   const {
     register,
     handleSubmit,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
   } = useForm<AppointmentFormData>({
+    mode: 'onChange',
     defaultValues,
   });
 
   // Create or update appointment
   const mutation = useMutation({
     mutationFn: (data: AppointmentFormData) => {
-      // Combine date + time into an ISO string
       const isoString = formatAppointmentDate(data.appointment_date, data.appointment_time);
       const payload = {
         ...data,
@@ -115,7 +116,12 @@ export default function NewAppointmentForm({ appointment, onSuccess }: NewAppoin
           />
         </div>
 
-        <Button type="submit" isLoading={isSubmitting} className="w-full">
+        <Button
+          type="submit"
+          isLoading={mutation.isLoading || isSubmitting}
+          disabled={mutation.isLoading || isSubmitting || !isValid}
+          className="w-full"
+        >
           {appointment ? 'Update Appointment' : 'Book Appointment'}
         </Button>
       </div>
