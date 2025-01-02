@@ -104,6 +104,7 @@ export async function getDentistAvailability(dentistId: number) {
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
+
 export async function createAppointmentType(data: {
   name: string;
   duration: number;
@@ -111,12 +112,14 @@ export async function createAppointmentType(data: {
 }) {
   return api.post('/appointment_types', { appointment_type: data });
 }
+
 export async function updateAppointmentType(
   id: number,
   data: { name: string; duration: number; description: string }
 ) {
   return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
+
 export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
@@ -145,6 +148,20 @@ export async function updateAppointment(appointmentId: number, data: any) {
 export async function cancelAppointment(appointmentId: number) {
   // Your backend does a full DELETE to remove the appointment
   return api.delete(`/appointments/${appointmentId}`);
+}
+
+/**
+ * (NEW) GET all appointments for a specific dentist on a given date
+ * so we can filter out time blocks that are already booked.
+ */
+export async function getDayAppointments(dentistId: number, date: string) {
+  // GET /appointments/day_appointments?dentist_id=X&date=YYYY-MM-DD
+  return api.get('/appointments/day_appointments', {
+    params: {
+      dentist_id: dentistId,
+      date: date,
+    },
+  });
 }
 
 /**
