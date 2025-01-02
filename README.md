@@ -12,7 +12,8 @@ This project is a **React + TypeScript + Vite** front-end for the **ISA Dental**
 4. [Running Locally](#running-locally)  
 5. [Environment Variables](#environment-variables)  
 6. [Deployment](#deployment)  
-7. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
+7. [Key Features](#key-features)  
+8. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
 
 ---
 
@@ -86,16 +87,19 @@ dentist-appointment-frontend
    - You can log in with test credentials (if using mock data or your backend’s seeded data).
 
 3. **Sign in / Sign up** as a user or use existing test credentials. Once authenticated, you can:  
-   - View and book appointments.  
-   - Manage your dependents.  
+   - View and book appointments (including picking a date, time slot, etc.).  
+   - Manage dependents.  
    - Update insurance information.  
-   - (If admin) Access Admin Dashboard to manage Appointment Types, view all appointments, etc.
+   - **(If admin)** Access the Admin Dashboard to manage:
+     - **Appointments** (view/cancel/reschedule all)
+     - **Appointment Types** (CRUD)
+     - **Users** (see all users, optionally promote them to admin)
 
 ---
 
 ## Environment Variables
 
-By default, the client looks for an environment variable in `.env`:
+By default, the client looks for environment variables in `.env`:
 
 - **`API_BASE_URL`**: The base URL for the ISA Dental backend API.  
   Example:  
@@ -126,10 +130,38 @@ Typical steps to deploy a Vite-based React app:
 
 ---
 
+## Key Features
+
+1. **Appointments**  
+   - Users can book new appointments, view upcoming ones, and cancel/reschedule if they meet the requirements (e.g., 24+ hours in advance).  
+   - Admin can view and manage all appointments.
+
+2. **Dependents**  
+   - Users can add/edit dependents.  
+   - Manage appointments for your dependents.
+
+3. **Insurance**  
+   - Users can view/update their insurance info (provider, policy number, plan type).
+
+4. **Admin Dashboard**  
+   - Available only to users with `role === 'admin'`.  
+   - **Tabs** for:
+     - **Appointments**: Admin sees all appointments site-wide.  
+     - **Appointment Types**: Create/edit/delete appointment types.  
+     - **Users**: View all user accounts.  
+       - **Promote** any user to admin role.
+
+5. **Role-based Access**  
+   - Regular users can only manage their own profile/appointments.  
+   - Admin sees + manages all appointments, appointment types, and users.
+
+---
+
 ## Future Enhancements / Next Steps
 
 - **Additional Form Validations**: Enhance error messages and validation logic for appointments or profile data.  
 - **User Notifications**: Integrate real-time notifications (e.g., WebSockets or push notifications) for appointment changes.  
 - **Accessibility**: Ensure best practices for screen readers and keyboard navigation.  
 - **i18n**: Internationalization support for multiple languages.  
-- **Theming**: Support multiple color schemes or branding.
+- **Theming**: Support multiple color schemes or branding.  
+- **Pagination**: Additional smooth or infinite scrolling pagination for large datasets (e.g., Admin user list).  
