@@ -1,6 +1,7 @@
 // File: /src/lib/api.ts
 
 import axios from 'axios';
+import type { ClosedDay } from '../../types';
 
 /**
  * 1) Determine baseURL. Adjust if needed for your environment.
@@ -26,11 +27,16 @@ api.interceptors.request.use((config) => {
 });
 
 /**
- * For ignoring the same appointment while rescheduling, your backend might accept:
+ * For ignoring the same appointment while rescheduling, 
+ * your backend might accept:
  *   GET /appointments/day_appointments?dentist_id=X&date=YYYY-MM-DD&ignore_id=Y
  * So we add an optional `ignoreId` param here.
  */
-export async function getDayAppointments(dentistId: number, date: string, ignoreId?: number) {
+export async function getDayAppointments(
+  dentistId: number,
+  date: string,
+  ignoreId?: number
+) {
   const params: any = {
     dentist_id: dentistId,
     date: date,
@@ -207,4 +213,25 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
   return api.get('/users/search', {
     params: { q: query, page, per_page: perPage },
   });
+}
+
+/**
+ * CLOSED DAYS (new table + model + controller)
+ * If your backend exposes /closed_days, 
+ * you can fetch, create, and delete them like this:
+ */
+
+// Fetch all closed days
+export async function getClosedDays() {
+  return api.get<ClosedDay[]>('/closed_days');
+}
+
+// Create a new closed day
+export async function createClosedDay(data: { date: string; reason?: string }) {
+  return api.post('/closed_days', { closed_day: data });
+}
+
+// Delete a closed day by ID
+export async function deleteClosedDay(id: number) {
+  return api.delete(`/closed_days/${id}`);
 }

@@ -5,6 +5,7 @@ import AppointmentTypes from './AppointmentTypes';
 import UsersList from './UsersList';
 import DashboardHeader from './DashboardHeader';
 import AdminCalendar from './AdminCalendar';
+import ClosedDaysList from './ClosedDaysList';
 
 export default function AdminDashboard() {
   return (
@@ -17,29 +18,31 @@ export default function AdminDashboard() {
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
             <TabsTrigger value="appointment-types">Appointment Types</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
-
-            {/* The new calendar tab: */}
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            
+            {/* New tab for managing closed days / holidays */}
+            <TabsTrigger value="closed-days">Closed Days</TabsTrigger>
           </TabsList>
 
-          {/* Render the “Appointments” section only when value="appointments” is active */}
           <TabsContent value="appointments">
             <AppointmentsList />
           </TabsContent>
 
-          {/* Render the “Appointment Types” section only when value="appointment-types” is active */}
           <TabsContent value="appointment-types">
             <AppointmentTypes />
           </TabsContent>
 
-          {/* Render the “Users” section only when value="users” is active */}
           <TabsContent value="users">
             <UsersList />
           </TabsContent>
 
-          {/* Render the Calendar */}
           <TabsContent value="calendar">
             <AdminCalendar />
+          </TabsContent>
+
+          {/* New content for viewing/adding/removing closed days */}
+          <TabsContent value="closed-days">
+            <ClosedDaysList />
           </TabsContent>
         </Tabs>
       </div>

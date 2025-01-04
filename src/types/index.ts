@@ -64,3 +64,11 @@ export interface Appointment {
   dentist?: Dentist;
   appointmentType?: AppointmentType;
 }
+
+export interface ClosedDay {
+  id: number;
+  date: string;       // e.g. "2025-12-25"
+  reason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
