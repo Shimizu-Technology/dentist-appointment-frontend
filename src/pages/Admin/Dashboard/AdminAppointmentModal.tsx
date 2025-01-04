@@ -1,7 +1,6 @@
-// File: /src/pages/Admin/Dashboard/AdminAppointmentModal.tsx
-
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { format } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createAppointment,
@@ -43,24 +42,24 @@ export default function AdminAppointmentModal({
   const isEditing = !!editingAppointment;
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  // React Hook Form
+  // Setup react-hook-form
   const { register, handleSubmit, watch, reset, setValue, formState } = useForm<FormData>({
     mode: 'onChange',
   });
   const { errors, isSubmitting, isValid } = formState;
 
-  // Fill form if editing or if we have a default date
+  // On open, prefill
   useEffect(() => {
     if (!isOpen) return;
 
     if (isEditing && editingAppointment) {
-      // Load the existing data
+      // Pre-fill with the existing appointment’s values
       const dt = new Date(editingAppointment.appointmentTime);
-      const dateStr = dt.toISOString().split('T')[0];  // e.g. 2025-01-07
-      const timeStr = dt.toTimeString().slice(0, 5);   // e.g. 14:00
+      const dateStr = dt.toISOString().split('T')[0]; // e.g. 2025-01-07
+      const timeStr = dt.toTimeString().slice(0, 5);  // e.g. 14:00
 
       reset({
-        user_id: '', // Usually can’t change user for existing appt
+        user_id: '', // Admin might not allow changing the user on an existing appt
         dentist_id: String(editingAppointment.dentistId),
         appointment_type_id: String(editingAppointment.appointmentTypeId),
         appointment_date: dateStr,
@@ -69,7 +68,7 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else if (!isEditing && defaultDate) {
-      // Creating new, but have a default date
+      // Creating new with a suggested date
       const dateStr = defaultDate.toISOString().split('T')[0];
       reset({
         user_id: '',
@@ -81,7 +80,7 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else {
-      // brand new, no defaults
+      // brand new, blank form
       reset({
         user_id: '',
         dentist_id: '',
@@ -94,10 +93,10 @@ export default function AdminAppointmentModal({
     }
   }, [isOpen, isEditing, editingAppointment, defaultDate, reset]);
 
-  // Submit: create or update
+  // Create or update logic
   const { mutateAsync: mutateAppointment } = useMutation({
     mutationFn: async (data: FormData) => {
-      // Convert date + time => ISO
+      // Combine date & time => ISO
       const isoString = buildIsoString(data.appointment_date, data.appointment_time);
 
       const payload: Record<string, any> = {
@@ -107,33 +106,32 @@ export default function AdminAppointmentModal({
         notes: data.notes,
       };
 
+      // If creating new, we can set user_id:
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
       }
 
+      // If editing
       if (isEditing && editingAppointment) {
-        // Update existing
         return updateAppointment(editingAppointment.id, payload);
       } else {
-        // Create new
         return createAppointment(payload);
       }
     },
     onSuccess: () => {
-      // Refresh queries
       queryClient.invalidateQueries(['admin-appointments']);
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
       onClose();
     },
     onError: (error: any) => {
-      alert(`Failed to save appointment: ${error.message}`);
+      alert(`Failed to save: ${error.message}`);
     },
   });
 
-  // Delete
+  // Delete / Cancel
   const { mutateAsync: deleteAppointmentMut } = useMutation({
     mutationFn: async () => {
-      if (!editingAppointment) throw new Error('No appointment selected');
+      if (!editingAppointment) throw new Error('No appointment to delete');
       return cancelAppointment(editingAppointment.id);
     },
     onSuccess: () => {
@@ -146,8 +144,8 @@ export default function AdminAppointmentModal({
     },
   });
 
-  const onSubmit = (formData: FormData) => {
-    mutateAppointment(formData);
+  const onSubmit = async (data: FormData) => {
+    await mutateAppointment(data);
   };
 
   const handleDelete = async () => {
@@ -159,11 +157,18 @@ export default function AdminAppointmentModal({
 
   if (!isOpen) return null;
 
+  // For display: original time
+  let originalTimeString = '';
+  if (isEditing && editingAppointment) {
+    const oldDateObj = new Date(editingAppointment.appointmentTime);
+    originalTimeString = format(oldDateObj, 'MMMM d, yyyy h:mm aa');
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white w-full max-w-2xl rounded-lg shadow-md">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b p-4">
+        {/* Header row */}
+        <div className="flex justify-between items-center border-b p-4">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit Appointment' : 'Create Appointment'}
           </h2>
@@ -172,9 +177,23 @@ export default function AdminAppointmentModal({
           </button>
         </div>
 
-        {/* Body / Form */}
+        {/* If editing: show patient + original time */}
+        {isEditing && editingAppointment?.user && (
+          <div className="px-4 py-2 bg-gray-50 border-b text-sm text-gray-700">
+            <p className="font-medium">Patient Info:</p>
+            <p>
+              {editingAppointment.user.firstName} {editingAppointment.user.lastName}
+              {' '}(<span className="text-gray-600">{editingAppointment.user.email}</span>)
+            </p>
+            <p className="mt-1">
+              <span className="font-medium">Currently scheduled:</span> {originalTimeString}
+            </p>
+          </div>
+        )}
+
+        {/* Body/Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-          {/* If new appointment, let admin pick user */}
+          {/* If new appointment, let the admin pick a user */}
           {!isEditing && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -187,9 +206,7 @@ export default function AdminAppointmentModal({
                 }}
               />
               {errors.user_id && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.user_id.message}
-                </p>
+                <p className="mt-1 text-sm text-red-600">{errors.user_id.message}</p>
               )}
             </div>
           )}
@@ -214,11 +231,11 @@ export default function AdminAppointmentModal({
               register={register}
               watch={watch}
               error={errors.appointment_time?.message}
-              editingAppointmentId={editingAppointment?.id} // Pass existing ID so we ignore ourselves
+              editingAppointmentId={editingAppointment?.id} // so we can ignore ourselves if needed
             />
           </div>
 
-          {/* Additional notes */}
+          {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Additional Notes
@@ -226,27 +243,20 @@ export default function AdminAppointmentModal({
             <textarea
               {...register('notes')}
               rows={4}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Optional notes..."
+              className="w-full border-gray-300 rounded-md shadow-sm 
+                         focus:ring-blue-500 focus:border-blue-500"
+              placeholder="(Optional) Any special requirements or details?"
             />
           </div>
 
-          {/* Footer */}
+          {/* Modal Footer */}
           <div className="flex justify-end space-x-4">
             {isEditing && (
-              <Button
-                variant="danger"
-                type="button"
-                onClick={handleDelete}
-              >
+              <Button variant="danger" type="button" onClick={handleDelete}>
                 Delete
               </Button>
             )}
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={onClose}
-            >
+            <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
             <Button
@@ -263,9 +273,7 @@ export default function AdminAppointmentModal({
   );
 }
 
-/**
- * Utility: combine date (YYYY-MM-DD) + time (HH:mm) => ISO string
- */
+/** Utility: Combine date(YYYY-MM-DD) + time(HH:mm) => ISO string */
 function buildIsoString(dateStr: string, timeStr: string) {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);

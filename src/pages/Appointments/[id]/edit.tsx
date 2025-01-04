@@ -1,26 +1,10 @@
-// File: /src/pages/Appointments/[id]/edit.tsx
-
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../../lib/api';
 import NewAppointmentForm from '../New/NewAppointmentForm';
 import { ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import Footer from '../../../components/Layout/Footer';
 import type { Appointment } from '../../../types';
 
-/** 
- * Match what your Rails (or other) backend actually returns:
- * {
- *   appointments: [...array of Appointment...],
- *   meta: {
- *     currentPage: number,
- *     totalPages: number,
- *     totalCount: number,
- *     perPage: number
- *   }
- * }
- */
 interface AppointmentsApiResponse {
   appointments: Appointment[];
   meta: {
@@ -35,12 +19,12 @@ export default function AppointmentEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Instead of <Appointment[]>, use the interface that matches our actual data:
+  // Query all appointments (the user sees only theirs, admin sees all).
   const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
     queryKey: ['appointments'],
     queryFn: async () => {
       const response = await getAppointments();
-      return response.data; // { appointments, meta: {...} }
+      return response.data;
     },
   });
 
@@ -70,10 +54,7 @@ export default function AppointmentEdit() {
     );
   }
 
-  // Extract the array from data
   const appointments = data?.appointments || [];
-
-  // Find the specific appointment by ID
   const appointment = appointments.find((a) => a.id === Number(id));
 
   if (!appointment) {
@@ -102,7 +83,7 @@ export default function AppointmentEdit() {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link 
+          <Link
             to={`/appointments/${id}`}
             className="inline-flex items-center text-blue-100 hover:text-white mb-6"
           >
@@ -117,10 +98,11 @@ export default function AppointmentEdit() {
           </p>
         </div>
       </div>
-      
-      {/* Form */}
+
+      {/* Body */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <NewAppointmentForm 
+        {/* Just use the existing appointment as default for NewAppointmentForm */}
+        <NewAppointmentForm
           appointment={appointment}
           onSuccess={() => navigate(`/appointments/${id}`)}
         />
