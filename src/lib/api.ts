@@ -3,21 +3,20 @@
 import axios from 'axios';
 
 /**
- * Determine which base URL to use
- * (Development vs. Production).
+ * 1) Determine baseURL. Adjust if needed for your environment.
  */
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
   : import.meta.env.VITE_LOCAL_API_BASE_URL;
 
 /**
- * 1) Export the axios instance by name: `api`
+ * 2) Export the axios instance (named `api`).
  */
 export const api = axios.create({
   baseURL,
 });
 
-// Interceptor to attach token from localStorage
+// Interceptor: attach JWT from localStorage if present
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token && config.headers) {
@@ -25,6 +24,25 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+/**
+ * For ignoring the same appointment while rescheduling, your backend might accept:
+ *   GET /appointments/day_appointments?dentist_id=X&date=YYYY-MM-DD&ignore_id=Y
+ * So we add an optional `ignoreId` param here.
+ */
+export async function getDayAppointments(dentistId: number, date: string, ignoreId?: number) {
+  const params: any = {
+    dentist_id: dentistId,
+    date: date,
+  };
+  if (ignoreId) {
+    params.ignore_id = ignoreId;
+  }
+
+  return api.get('/appointments/day_appointments', { params });
+}
+
+/** -- Additional Example endpoints: -- */
 
 /**
  * LOGIN / SESSIONS
@@ -43,7 +61,6 @@ export async function signup(
   lastName: string,
   role?: string
 ) {
-  // “role” only works if the current user is admin (per your backend’s logic).
   return api.post('/users', {
     user: {
       email,
@@ -56,7 +73,7 @@ export async function signup(
 }
 
 /**
- * Update the current logged-in user
+ * Update the current user (e.g., phone, email, etc.)
  */
 export async function updateCurrentUser(data: {
   first_name?: string;
@@ -64,26 +81,9 @@ export async function updateCurrentUser(data: {
   phone?: string;
   email?: string;
 }) {
-  // PATCH /api/v1/users/current
   return api.patch('/users/current', {
     user: data,
   });
-}
-
-/**
- * GET Users (Admin-only)
- */
-export async function getUsers(page = 1, perPage = 10) {
-  return api.get('/users', {
-    params: { page, per_page: perPage },
-  });
-}
-
-/**
- * Promote user to admin (Admin-only)
- */
-export async function promoteUser(userId: number) {
-  return api.patch(`/users/${userId}/promote`);
 }
 
 /**
@@ -94,8 +94,31 @@ export async function getDentists() {
 }
 
 export async function getDentistAvailability(dentistId: number) {
-  // GET /dentists/:id/availabilities
   return api.get(`/dentists/${dentistId}/availabilities`);
+}
+
+/**
+ * APPOINTMENTS
+ */
+export async function getAppointments(page?: number, perPage?: number) {
+  return api.get('/appointments', {
+    params: {
+      page,
+      per_page: perPage,
+    },
+  });
+}
+
+export async function createAppointment(data: any) {
+  return api.post('/appointments', { appointment: data });
+}
+
+export async function updateAppointment(appointmentId: number, data: any) {
+  return api.patch(`/appointments/${appointmentId}`, { appointment: data });
+}
+
+export async function cancelAppointment(appointmentId: number) {
+  return api.delete(`/appointments/${appointmentId}`);
 }
 
 /**
@@ -122,46 +145,6 @@ export async function updateAppointmentType(
 
 export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
-}
-
-/**
- * APPOINTMENTS
- */
-export async function getAppointments(page?: number, perPage?: number) {
-  return api.get('/appointments', {
-    params: {
-      page,
-      per_page: perPage,
-    },
-  });
-}
-
-export async function createAppointment(data: any) {
-  // Must wrap in { appointment: {...} } for Rails
-  return api.post('/appointments', { appointment: data });
-}
-
-export async function updateAppointment(appointmentId: number, data: any) {
-  return api.patch(`/appointments/${appointmentId}`, { appointment: data });
-}
-
-export async function cancelAppointment(appointmentId: number) {
-  // Your backend does a full DELETE to remove the appointment
-  return api.delete(`/appointments/${appointmentId}`);
-}
-
-/**
- * (NEW) GET all appointments for a specific dentist on a given date
- * so we can filter out time blocks that are already booked.
- */
-export async function getDayAppointments(dentistId: number, date: string) {
-  // GET /appointments/day_appointments?dentist_id=X&date=YYYY-MM-DD
-  return api.get('/appointments/day_appointments', {
-    params: {
-      dentist_id: dentistId,
-      date: date,
-    },
-  });
 }
 
 /**
@@ -194,7 +177,6 @@ export async function updateInsurance(insuranceData: {
   policyNumber: string;
   planType: string;
 }) {
-  // Adjust as needed for your backend route
   return api.patch('/users/current', {
     user: {
       provider_name: insuranceData.providerName,
@@ -202,4 +184,17 @@ export async function updateInsurance(insuranceData: {
       plan_type: insuranceData.planType,
     },
   });
+}
+
+/**
+ * USERS (Admin-only)
+ */
+export async function getUsers(page = 1, perPage = 10) {
+  return api.get('/users', {
+    params: { page, per_page: perPage },
+  });
+}
+
+export async function promoteUser(userId: number) {
+  return api.patch(`/users/${userId}/promote`);
 }
