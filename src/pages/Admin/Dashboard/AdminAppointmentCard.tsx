@@ -1,10 +1,12 @@
 // File: /src/pages/Admin/Dashboard/AdminAppointmentCard.tsx
 
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Clock, User, Edit2, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateAppointment, cancelAppointment } from '../../../lib/api';
+import { cancelAppointment } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
+import AdminAppointmentModal from './AdminAppointmentModal';
 import type { Appointment } from '../../../types';
 
 interface AdminAppointmentCardProps {
@@ -14,55 +16,28 @@ interface AdminAppointmentCardProps {
 export default function AdminAppointmentCard({ appointment }: AdminAppointmentCardProps) {
   const queryClient = useQueryClient();
 
-  // Display a color-coded badge for appointment status
-  const statusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  };
-
-  // Reschedule mutation (naive approach with a prompt)
-  const handleReschedule = useMutation({
-    mutationFn: async (newTime: string) => {
-      return updateAppointment(appointment.id, {
-        appointment_time: newTime,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['admin-appointments']);
-    },
-    onError: (error: any) => {
-      alert(`Failed to reschedule: ${error.message}`);
-    },
-  });
+  // For opening the AdminAppointmentModal (in “edit” mode)
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Cancel mutation
-  const handleCancel = useMutation({
+  const { mutate: handleCancel, isPending: isCancelling } = useMutation({
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-appointments']);
+      queryClient.invalidateQueries(['admin-appointments-for-calendar']);
     },
     onError: (error: any) => {
       alert(`Failed to cancel: ${error.message}`);
     },
   });
 
-  const doReschedule = () => {
-    const newDateTime = window.prompt(
-      'Enter new appointment_time (YYYY-MM-DDTHH:mm:00Z)',
-      appointment.appointmentTime
-    );
-    if (!newDateTime) return;
-    handleReschedule.mutate(newDateTime);
-  };
-
   const onCancelClick = () => {
     const yes = window.confirm('Are you sure you want to cancel this appointment?');
     if (!yes) return;
-    handleCancel.mutate();
+    handleCancel();
   };
 
-  // Safely parse the date/time
+  // Parse date/time safely
   let parsedDate: Date | null = null;
   try {
     parsedDate = new Date(appointment.appointmentTime);
@@ -72,6 +47,13 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
   } catch {
     parsedDate = null;
   }
+
+  // Display a color-coded badge for appointment status
+  const statusColors: Record<string, string> = {
+    scheduled: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -91,6 +73,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
             }
           </p>
         </div>
+
         <span
           className={[
             'px-3 py-1 rounded-full text-sm font-medium',
@@ -118,7 +101,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           <p className="text-sm text-red-500">Invalid date/time</p>
         )}
 
-        {/* Dentist info */}
         {appointment.dentist && (
           <div className="flex items-center text-gray-600">
             <User className="w-5 h-5 mr-2" />
@@ -129,29 +111,38 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
 
       {/* Actions row */}
       <div className="flex space-x-4">
+        {/* Instead of a prompt, show our “Appointment Form” in a modal */}
         {appointment.status === 'scheduled' && (
           <Button
             variant="outline"
-            onClick={doReschedule}
+            onClick={() => setShowEditModal(true)}
             className="flex items-center"
-            isLoading={handleReschedule.isPending}
           >
             <Edit2 className="w-4 h-4 mr-2" />
             Reschedule
           </Button>
         )}
+
+        {/* Cancel only if scheduled */}
         {appointment.status === 'scheduled' && (
           <Button
             variant="secondary"
             onClick={onCancelClick}
+            isLoading={isCancelling}
             className="flex items-center text-red-600 hover:text-red-700"
-            isLoading={handleCancel.isPending}
           >
             <X className="w-4 h-4 mr-2" />
             Cancel
           </Button>
         )}
       </div>
+
+      {/* This is our unified "edit" modal */}
+      <AdminAppointmentModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        editingAppointment={appointment} // Pre-fills data
+      />
     </div>
   );
 }
