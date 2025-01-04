@@ -217,21 +217,17 @@ export async function deleteClosedDay(id: number) {
 /** ------------------------------------------------------------------
  * SCHEDULES (Admin-only)
  * ------------------------------------------------------------------ */
-/**
- * If you’re consolidating your schedules to store “clinic open/close times”
- * plus dentist availabilities + closed days, you might do:
- */
 export async function getSchedules() {
-  // GET /schedules => { clinicOpenTime, clinicCloseTime, closedDays, dentistAvailabilities, ... }
-  return api.get('/schedules');
+  // GET /api/v1/schedule (singular)
+  return api.get('/schedule');
 }
 
 export async function updateSchedules(data: {
   clinic_open_time: string;
   clinic_close_time: string;
 }) {
-  // PATCH /schedules => update clinic’s open/close times
-  return api.patch('/schedules', data);
+  // PATCH /api/v1/schedule (singular)
+  return api.patch('/schedule', data);
 }
 
 /** If you choose to have dedicated DentistAvailability CRUD (optional) */

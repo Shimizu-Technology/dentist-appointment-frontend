@@ -1,12 +1,12 @@
 // File: /src/pages/Admin/Dashboard/index.tsx
+
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/UI/Tabs';
 import AppointmentsList from './AppointmentsList';
 import AppointmentTypes from './AppointmentTypes';
 import UsersList from './UsersList';
 import DashboardHeader from './DashboardHeader';
 import AdminCalendar from './AdminCalendar';
-import ClosedDaysList from './ClosedDaysList';
-import SchedulesList from './SchedulesList'; // <-- import our SchedulesList here
+import SchedulesList from './SchedulesList';
 
 export default function AdminDashboard() {
   return (
@@ -20,8 +20,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="appointment-types">Appointment Types</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="closed-days">Closed Days</TabsTrigger>
-            {/* NEW TAB for consolidated schedules (office hours, closed days, etc.) */}
             <TabsTrigger value="schedules">Schedules</TabsTrigger>
           </TabsList>
 
@@ -41,11 +39,6 @@ export default function AdminDashboard() {
             <AdminCalendar />
           </TabsContent>
 
-          <TabsContent value="closed-days">
-            <ClosedDaysList />
-          </TabsContent>
-
-          {/* The new consolidated Schedules tab */}
           <TabsContent value="schedules">
             <SchedulesList />
           </TabsContent>
