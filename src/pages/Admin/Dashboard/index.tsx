@@ -6,6 +6,7 @@ import UsersList from './UsersList';
 import DashboardHeader from './DashboardHeader';
 import AdminCalendar from './AdminCalendar';
 import ClosedDaysList from './ClosedDaysList';
+import SchedulesList from './SchedulesList'; // <-- import our SchedulesList here
 
 export default function AdminDashboard() {
   return (
@@ -19,9 +20,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="appointment-types">Appointment Types</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            
-            {/* New tab for managing closed days / holidays */}
             <TabsTrigger value="closed-days">Closed Days</TabsTrigger>
+            {/* NEW TAB for consolidated schedules (office hours, closed days, etc.) */}
+            <TabsTrigger value="schedules">Schedules</TabsTrigger>
           </TabsList>
 
           <TabsContent value="appointments">
@@ -40,9 +41,13 @@ export default function AdminDashboard() {
             <AdminCalendar />
           </TabsContent>
 
-          {/* New content for viewing/adding/removing closed days */}
           <TabsContent value="closed-days">
             <ClosedDaysList />
+          </TabsContent>
+
+          {/* The new consolidated Schedules tab */}
+          <TabsContent value="schedules">
+            <SchedulesList />
           </TabsContent>
         </Tabs>
       </div>

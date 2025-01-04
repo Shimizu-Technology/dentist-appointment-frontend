@@ -27,39 +27,29 @@ api.interceptors.request.use((config) => {
 });
 
 /**
- * For ignoring the same appointment while rescheduling, 
+ * For ignoring the same appointment while rescheduling,
  * your backend might accept:
  *   GET /appointments/day_appointments?dentist_id=X&date=YYYY-MM-DD&ignore_id=Y
- * So we add an optional `ignoreId` param here.
  */
 export async function getDayAppointments(
   dentistId: number,
   date: string,
   ignoreId?: number
 ) {
-  const params: any = {
-    dentist_id: dentistId,
-    date: date,
-  };
+  const params: any = { dentist_id: dentistId, date };
   if (ignoreId) {
     params.ignore_id = ignoreId;
   }
-
   return api.get('/appointments/day_appointments', { params });
 }
 
-/** -- Additional Example endpoints: -- */
-
-/**
- * LOGIN / SESSIONS
- */
+/** ------------------------------------------------------------------
+ * AUTH / SESSIONS
+ * ------------------------------------------------------------------ */
 export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
 
-/**
- * SIGNUP
- */
 export async function signup(
   email: string,
   password: string,
@@ -78,9 +68,9 @@ export async function signup(
   });
 }
 
-/**
- * Update the current user (e.g., phone, email, etc.)
- */
+/** ------------------------------------------------------------------
+ * CURRENT USER
+ * ------------------------------------------------------------------ */
 export async function updateCurrentUser(data: {
   first_name?: string;
   last_name?: string;
@@ -92,26 +82,24 @@ export async function updateCurrentUser(data: {
   });
 }
 
-/**
+/** ------------------------------------------------------------------
  * DENTISTS
- */
+ * ------------------------------------------------------------------ */
 export async function getDentists() {
   return api.get('/dentists');
 }
 
 export async function getDentistAvailability(dentistId: number) {
+  // GET /dentists/:id/availabilities
   return api.get(`/dentists/${dentistId}/availabilities`);
 }
 
-/**
+/** ------------------------------------------------------------------
  * APPOINTMENTS
- */
+ * ------------------------------------------------------------------ */
 export async function getAppointments(page?: number, perPage?: number) {
   return api.get('/appointments', {
-    params: {
-      page,
-      per_page: perPage,
-    },
+    params: { page, per_page: perPage },
   });
 }
 
@@ -127,9 +115,9 @@ export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
 }
 
-/**
+/** ------------------------------------------------------------------
  * APPOINTMENT TYPES
- */
+ * ------------------------------------------------------------------ */
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
@@ -153,9 +141,9 @@ export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
 
-/**
+/** ------------------------------------------------------------------
  * DEPENDENTS
- */
+ * ------------------------------------------------------------------ */
 export async function getDependents() {
   return api.get('/dependents');
 }
@@ -175,9 +163,9 @@ export async function updateDependent(
   return api.patch(`/dependents/${dependentId}`, { dependent: data });
 }
 
-/**
- * INSURANCE
- */
+/** ------------------------------------------------------------------
+ * INSURANCE (Update as part of user data)
+ * ------------------------------------------------------------------ */
 export async function updateInsurance(insuranceData: {
   providerName: string;
   policyNumber: string;
@@ -192,13 +180,11 @@ export async function updateInsurance(insuranceData: {
   });
 }
 
-/**
+/** ------------------------------------------------------------------
  * USERS (Admin-only)
- */
+ * ------------------------------------------------------------------ */
 export async function getUsers(page = 1, perPage = 10) {
-  return api.get('/users', {
-    params: { page, per_page: perPage },
-  });
+  return api.get('/users', { params: { page, per_page: perPage } });
 }
 
 export async function promoteUser(userId: number) {
@@ -210,28 +196,69 @@ export async function promoteUser(userId: number) {
  * GET /users/search?q=...&page=...&per_page=...
  */
 export async function searchUsers(query: string, page = 1, perPage = 10) {
-  return api.get('/users/search', {
-    params: { q: query, page, per_page: perPage },
-  });
+  return api.get('/users/search', { params: { q: query, page, per_page: perPage } });
 }
 
-/**
- * CLOSED DAYS (new table + model + controller)
- * If your backend exposes /closed_days, 
- * you can fetch, create, and delete them like this:
- */
-
-// Fetch all closed days
+/** ------------------------------------------------------------------
+ * CLOSED DAYS
+ * ------------------------------------------------------------------ */
 export async function getClosedDays() {
   return api.get<ClosedDay[]>('/closed_days');
 }
 
-// Create a new closed day
 export async function createClosedDay(data: { date: string; reason?: string }) {
   return api.post('/closed_days', { closed_day: data });
 }
 
-// Delete a closed day by ID
 export async function deleteClosedDay(id: number) {
   return api.delete(`/closed_days/${id}`);
+}
+
+/** ------------------------------------------------------------------
+ * SCHEDULES (Admin-only)
+ * ------------------------------------------------------------------ */
+/**
+ * If you’re consolidating your schedules to store “clinic open/close times”
+ * plus dentist availabilities + closed days, you might do:
+ */
+export async function getSchedules() {
+  // GET /schedules => { clinicOpenTime, clinicCloseTime, closedDays, dentistAvailabilities, ... }
+  return api.get('/schedules');
+}
+
+export async function updateSchedules(data: {
+  clinic_open_time: string;
+  clinic_close_time: string;
+}) {
+  // PATCH /schedules => update clinic’s open/close times
+  return api.patch('/schedules', data);
+}
+
+/** If you choose to have dedicated DentistAvailability CRUD (optional) */
+export async function createDentistAvailability(data: {
+  dentist_id: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}) {
+  return api.post('/dentist_availabilities', {
+    dentist_availability: data,
+  });
+}
+
+export async function updateDentistAvailability(
+  id: number,
+  data: {
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }
+) {
+  return api.patch(`/dentist_availabilities/${id}`, {
+    dentist_availability: data,
+  });
+}
+
+export async function deleteDentistAvailability(id: number) {
+  return api.delete(`/dentist_availabilities/${id}`);
 }
