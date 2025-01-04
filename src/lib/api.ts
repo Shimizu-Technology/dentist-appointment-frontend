@@ -198,3 +198,13 @@ export async function getUsers(page = 1, perPage = 10) {
 export async function promoteUser(userId: number) {
   return api.patch(`/users/${userId}/promote`);
 }
+
+/** 
+ * Search users by name/email (Admin-only).
+ * GET /users/search?q=...&page=...&per_page=...
+ */
+export async function searchUsers(query: string, page = 1, perPage = 10) {
+  return api.get('/users/search', {
+    params: { q: query, page, per_page: perPage },
+  });
+}

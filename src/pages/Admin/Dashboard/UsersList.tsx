@@ -1,10 +1,10 @@
 // File: /src/pages/Admin/Dashboard/UsersList.tsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getUsers, promoteUser } from '../../../lib/api';
-import type { User } from '../../../types';
+import { getUsers, promoteUser, searchUsers } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
+import type { User } from '../../../types';
 
 interface UsersApiResponse {
   users: User[];
@@ -19,61 +19,93 @@ interface UsersApiResponse {
 export default function UsersList() {
   const [page, setPage] = useState(1);
 
-  // Query the backend for a single page of users
-  const {
-    data,
-    isLoading,
-    error,
-    isFetching,
-  } = useQuery<UsersApiResponse>({
-    queryKey: ['users', page],
+  // `searchTerm` holds the immediate user input
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // `debouncedTerm` changes only after a timeout
+  const [debouncedTerm, setDebouncedTerm] = useState('');
+
+  // Whenever `searchTerm` changes, schedule an update to `debouncedTerm`
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedTerm(searchTerm);
+    }, 500); // 500ms delay (you can adjust as needed)
+
+    // Cleanup if user types again before 500ms is up
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Use `debouncedTerm` in the query key & logic
+  const { data, isLoading, error, isFetching } = useQuery<UsersApiResponse>({
+    queryKey: ['users', page, debouncedTerm],
     queryFn: async () => {
-      const response = await getUsers(page, 10); // 10 per page
-      return response.data; // => { users: [...], meta: {...} }
+      const query = debouncedTerm.trim();
+      if (query.length > 0) {
+        const response = await searchUsers(query, page, 10);
+        return response.data;
+      } else {
+        const response = await getUsers(page, 10);
+        return response.data;
+      }
     },
-    keepPreviousData: true, // avoid flicker on page transitions
+    keepPreviousData: true, // Keep old data while fetching next page
   });
+
+  async function handlePromote(userId: number) {
+    const yes = window.confirm('Are you sure you want to promote this user to admin?');
+    if (!yes) return;
+
+    try {
+      await promoteUser(userId);
+      // Optionally trigger a refetch or rely on the existing data refresh
+    } catch (err: any) {
+      alert(`Failed to promote user: ${err.message}`);
+    }
+  }
 
   if (isLoading) {
     return (
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
       </div>
     );
   }
-
   if (error) {
     return (
-      <div className="text-center py-8 text-red-600">
+      <div className="text-center py-12 text-red-600">
         Failed to load users. Please try again later.
       </div>
     );
   }
-
   if (!data) {
     return null;
   }
 
   const { users, meta } = data;
 
-  // Handler for “Promote to Admin”
-  const handlePromote = async (userId: number) => {
-    const yes = window.confirm('Are you sure you want to promote this user to admin?');
-    if (!yes) return;
-    try {
-      await promoteUser(userId);
-      // Force a re-fetch to reflect the updated role
-      // Option 1: manually update local state
-      // Option 2: just re-run the query
-    } catch (err: any) {
-      alert('Failed to promote user: ' + err.message);
-    }
-  };
-
   return (
-    <div>
-      <h2 className="text-2xl font-semibold text-gray-900 mb-6">All Users</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold text-gray-900">All Users</h2>
 
+      {/* SEARCH BAR */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Search by Name or Email
+        </label>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => {
+            setPage(1); // Reset to first page when user starts typing
+            setSearchTerm(e.target.value);
+          }}
+          className="w-full border border-gray-300 rounded-md px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+          placeholder='e.g. "Jane", "user@example.com"'
+        />
+      </div>
+
+      {/* LIST OF USERS */}
       <div className="space-y-4">
         {users.map((u) => (
           <div
@@ -102,7 +134,7 @@ export default function UsersList() {
         ))}
       </div>
 
-      {/* Pagination controls */}
+      {/* PAGINATION CONTROLS */}
       <div className="flex justify-center items-center mt-8 space-x-4">
         <Button
           variant="outline"
