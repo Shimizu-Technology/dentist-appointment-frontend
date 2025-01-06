@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar, Clock, User, Edit2, X } from 'lucide-react';
+import { Calendar, Clock, User, Edit2, X, CheckCircle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { cancelAppointment } from '../../../lib/api';
+import { cancelAppointment, updateAppointment } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
 import AdminAppointmentModal from './AdminAppointmentModal';
 import type { Appointment } from '../../../types';
@@ -31,10 +31,33 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
+  // NEW: “Complete” mutation
+  const { mutate: handleComplete, isPending: isCompleting } = useMutation({
+    mutationFn: async () => {
+      // We call the normal update endpoint with { status: 'completed' }.
+      return updateAppointment(appointment.id, { status: 'completed' });
+    },
+    onSuccess: () => {
+      // Re-fetch to see updated status.
+      queryClient.invalidateQueries(['admin-appointments']);
+      queryClient.invalidateQueries(['admin-appointments-for-calendar']);
+      toast.success('Appointment marked as completed!');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to complete appointment: ${error.message}`);
+    },
+  });
+
   const onCancelClick = () => {
     const yes = window.confirm('Are you sure you want to cancel this appointment?');
     if (!yes) return;
     handleCancel();
+  };
+
+  const onCompleteClick = () => {
+    const yes = window.confirm('Mark this appointment as completed?');
+    if (!yes) return;
+    handleComplete();
   };
 
   let parsedDate: Date | null = null;
@@ -109,31 +132,43 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
 
       {/* Actions row */}
       <div className="flex space-x-4">
+        {/* If still scheduled, allow Reschedule, Cancel, or Complete */}
         {appointment.status === 'scheduled' && (
-          <Button
-            variant="outline"
-            onClick={() => setShowEditModal(true)}
-            className="flex items-center"
-          >
-            <Edit2 className="w-4 h-4 mr-2" />
-            Reschedule
-          </Button>
-        )}
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditModal(true)}
+              className="flex items-center"
+            >
+              <Edit2 className="w-4 h-4 mr-2" />
+              Reschedule
+            </Button>
 
-        {appointment.status === 'scheduled' && (
-          <Button
-            variant="secondary"
-            onClick={onCancelClick}
-            isLoading={isCancelling}
-            className="flex items-center text-red-600 hover:text-red-700"
-          >
-            <X className="w-4 h-4 mr-2" />
-            Cancel
-          </Button>
+            <Button
+              variant="secondary"
+              onClick={onCancelClick}
+              isLoading={isCancelling}
+              className="flex items-center text-red-600 hover:text-red-700"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+
+            {/* NEW: Mark as Completed */}
+            <Button
+              variant="outline"
+              onClick={onCompleteClick}
+              isLoading={isCompleting}
+              className="flex items-center text-green-700 hover:text-green-800"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Complete
+            </Button>
+          </>
         )}
       </div>
 
-      {/* Edit modal */}
+      {/* Edit modal for rescheduling */}
       <AdminAppointmentModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
