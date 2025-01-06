@@ -1,6 +1,4 @@
-// File: /src/utils/unavailability.ts
 import { DentistUnavailability } from '../types';
-import { mockUnavailability } from '../lib/mockData/unavailability';
 
 /**
  * Return true if the dentist is *available* on the given date,
@@ -9,10 +7,10 @@ import { mockUnavailability } from '../lib/mockData/unavailability';
 export function isDayAvailable(
   dentistId: number,
   date: Date,
-  unavailability: DentistUnavailability[] = mockUnavailability
+  unavailability: DentistUnavailability[] = []
 ): boolean {
   const dateStr = date.toISOString().split('T')[0];
-  // If there's any unavailability record for that date, we consider the day blocked (simplified).
+  // If there's any unavailability record for that date, we consider it blocked (simplified).
   return !unavailability.some(u => u.dentistId === dentistId && u.date === dateStr);
 }
 
@@ -23,7 +21,7 @@ export function getAvailableTimeSlots(
   dentistId: number,
   date: Date,
   appointmentDuration: number,
-  unavailability: DentistUnavailability[] = mockUnavailability,
+  unavailability: DentistUnavailability[] = [],
   clinicOpenTime: string = '09:00',
   clinicCloseTime: string = '17:00'
 ): string[] {
