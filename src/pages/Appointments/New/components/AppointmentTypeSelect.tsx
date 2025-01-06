@@ -1,13 +1,12 @@
+// File: /src/pages/Appointments/New/components/AppointmentTypeSelect.tsx
 import { useQuery } from '@tanstack/react-query';
 import { getAppointmentTypes } from '../../../../lib/api';
+import { useFormContext } from 'react-hook-form';
 import type { AppointmentType } from '../../../../types';
 
-interface AppointmentTypeSelectProps {
-  register: any;
-  error?: string;
-}
+export default function AppointmentTypeSelect() {
+  const { register, formState: { errors } } = useFormContext();
 
-export default function AppointmentTypeSelect({ register, error }: AppointmentTypeSelectProps) {
   const { data: appointmentTypes } = useQuery<AppointmentType[]>({
     queryKey: ['appointmentTypes'],
     queryFn: async () => {
@@ -22,8 +21,10 @@ export default function AppointmentTypeSelect({ register, error }: AppointmentTy
         Appointment Type
       </label>
       <select
-        // IMPORTANT: “appointment_type_id”
-        {...register('appointment_type_id', { required: 'Please select an appointment type' })}
+        // Instead of props.register, we do:
+        {...register('appointment_type_id', {
+          required: 'Please select an appointment type',
+        })}
         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
       >
         <option value="">Select type of appointment</option>
@@ -33,7 +34,13 @@ export default function AppointmentTypeSelect({ register, error }: AppointmentTy
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+
+      {/* If you want to show error: */}
+      {errors.appointment_type_id && (
+        <p className="mt-1 text-sm text-red-600">
+          {errors.appointment_type_id.message as string}
+        </p>
+      )}
     </div>
   );
 }

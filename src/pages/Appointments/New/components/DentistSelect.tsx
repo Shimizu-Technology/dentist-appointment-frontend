@@ -1,13 +1,12 @@
+// File: /src/pages/Appointments/New/components/DentistSelect.tsx
 import { useQuery } from '@tanstack/react-query';
 import { getDentists } from '../../../../lib/api';
+import { useFormContext } from 'react-hook-form';
 import type { Dentist } from '../../../../types';
 
-interface DentistSelectProps {
-  register: any;
-  error?: string;
-}
+export default function DentistSelect() {
+  const { register, formState: { errors } } = useFormContext();
 
-export default function DentistSelect({ register, error }: DentistSelectProps) {
   const { data: dentists } = useQuery<Dentist[]>({
     queryKey: ['dentists'],
     queryFn: async () => {
@@ -22,7 +21,6 @@ export default function DentistSelect({ register, error }: DentistSelectProps) {
         Select Dentist
       </label>
       <select
-        // IMPORTANT: “dentist_id”
         {...register('dentist_id', { required: 'Please select a dentist' })}
         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
       >
@@ -33,7 +31,12 @@ export default function DentistSelect({ register, error }: DentistSelectProps) {
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+
+      {errors.dentist_id && (
+        <p className="mt-1 text-sm text-red-600">
+          {errors.dentist_id.message as string}
+        </p>
+      )}
     </div>
   );
 }
