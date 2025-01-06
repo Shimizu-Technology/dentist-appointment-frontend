@@ -1,4 +1,5 @@
 // File: /src/pages/Admin/Dashboard/AdminCalendar.tsx
+
 import { useRef, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import FullCalendar from '@fullcalendar/react';
@@ -22,6 +23,7 @@ import {
 import type { Appointment, Dentist, ClosedDay } from '../../../types';
 import AdminAppointmentModal from './AdminAppointmentModal';
 import Button from '../../../components/UI/Button';
+import toast from 'react-hot-toast';
 
 interface PaginatedAppointments {
   appointments: Appointment[];
@@ -59,7 +61,6 @@ export default function AdminCalendar() {
       const res = await getSchedules(); // GET /schedule
       return res.data;                 // { clinicOpenTime, clinicCloseTime, openDays, ... }
     },
-    // you could set a staleTime or refetchOnWindowFocus if you like
   });
 
   /** 2) FETCH the list of Dentists (for the dropdown) */
@@ -99,12 +100,12 @@ export default function AdminCalendar() {
     const dur = appt.appointmentType?.duration ?? 60;
     const end = new Date(start.getTime() + dur * 60_000);
 
-    // Color them by status
-    let backgroundColor = '#86efac'; // Scheduled => green
+    // NEW, more tailored color palette for status:
+    let backgroundColor = '#7dd3fc'; // "Scheduled" => a nice Tailwind blue-300
     if (appt.status === 'cancelled') {
-      backgroundColor = '#fca5a5'; // Red
+      backgroundColor = '#f87171'; // Red-400
     } else if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd'; // Blue
+      backgroundColor = '#4ade80'; // Green-400
     }
 
     return {
@@ -127,7 +128,8 @@ export default function AdminCalendar() {
     end: cd.date,
     allDay: true,
     display: 'background',
-    backgroundColor: '#d1d5db', // gray-300
+    // A lighter gray for closed blocks
+    backgroundColor: '#e2e8f0', // Tailwind gray-200
     title: cd.reason || 'Closed Day',
     overlap: false, // so it won't overlap with appt events
   }));
@@ -152,7 +154,7 @@ export default function AdminCalendar() {
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
     if (clickInfo.event.display === 'background') {
-      // That means user clicked a closed day block => ignore or show some message
+      // That means user clicked a closed-day block => ignore or show a message
       return;
     }
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
@@ -191,8 +193,9 @@ export default function AdminCalendar() {
           appointment_time: event.start.toISOString(),
         });
         queryClient.invalidateQueries(['admin-appointments-for-calendar', selectedDentistId]);
+        toast.success(`Appointment #${appt.id} updated!`);
       } catch (err: any) {
-        alert('Could not reschedule appointment.');
+        toast.error('Could not reschedule appointment.');
         dropInfo.revert();
       }
     },
@@ -247,19 +250,19 @@ export default function AdminCalendar() {
       {/* LEGEND */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
-          <ColorDot color="#86efac" />
+          <ColorDot color="#7dd3fc" />
           <span>Scheduled</span>
         </div>
         <div className="flex items-center gap-1">
-          <ColorDot color="#fca5a5" />
+          <ColorDot color="#f87171" />
           <span>Cancelled</span>
         </div>
         <div className="flex items-center gap-1">
-          <ColorDot color="#93c5fd" />
+          <ColorDot color="#4ade80" />
           <span>Completed</span>
         </div>
         <div className="flex items-center gap-1">
-          <ColorDot color="#d1d5db" />
+          <ColorDot color="#e2e8f0" />
           <span>Closed Day</span>
         </div>
       </div>
@@ -275,10 +278,8 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        // Let FullCalendar create half-hour labels, but we snap to 15-min if you like
         slotDuration="00:15:00"
         snapDuration="00:30:00"
-        // Show from early morning to late, then businessHours highlights
         slotMinTime="08:00:00"
         slotMaxTime="21:00:00"
         headerToolbar={{
@@ -286,14 +287,12 @@ export default function AdminCalendar() {
           center: 'title',
           right: 'timeGridWeek,dayGridMonth',
         }}
-        // The important part: use the *fetched* openDays/time
         businessHours={{
-          daysOfWeek: openDays,  // e.g. [0,1,2,3,4,5,6] => Sunday..Saturday
-          startTime: openTime,   // e.g. "09:00"
-          endTime: closeTime,    // e.g. "17:00"
+          daysOfWeek: openDays,
+          startTime: openTime,
+          endTime: closeTime,
         }}
         displayEventTime
-        // Combine appts + closed day background events
         events={allEvents}
         height="auto"
       />
