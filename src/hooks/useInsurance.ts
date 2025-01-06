@@ -1,6 +1,9 @@
+// File: /src/hooks/useInsurance.ts
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateInsurance } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import toast from 'react-hot-toast';
 
 export function useInsurance() {
   const queryClient = useQueryClient();
@@ -18,7 +21,11 @@ export function useInsurance() {
       }
       // Invalidate any relevant queries
       queryClient.invalidateQueries({ queryKey: ['user'] });
-    }
+      toast.success('Insurance information updated!');
+    },
+    onError: (err: any) => {
+      toast.error(`Failed to update insurance: ${err.message}`);
+    },
   });
 
   return {

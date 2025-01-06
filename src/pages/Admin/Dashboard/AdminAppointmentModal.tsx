@@ -1,4 +1,5 @@
 // File: /src/pages/Admin/Dashboard/AdminAppointmentModal.tsx
+
 import { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { X } from 'lucide-react';
@@ -17,6 +18,7 @@ import TimeSlotPicker from '../../../pages/Appointments/New/components/TimeSlotP
 
 import UserSearchSelect from './UserSearchSelect';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 interface Appointment {
   id: number;
@@ -37,7 +39,6 @@ interface AdminAppointmentModalProps {
   onClose: () => void;
   editingAppointment: Appointment | null;
   defaultDate?: Date | null;
-  /** NEW: Let parent pass a default dentist if only one is selected */
   defaultDentistId?: number;
 }
 
@@ -45,8 +46,8 @@ interface FormData {
   user_id?: string;
   dentist_id: string;
   appointment_type_id: string;
-  appointment_date: string; // "YYYY-MM-DD"
-  appointment_time: string; // "HH:mm"
+  appointment_date: string; 
+  appointment_time: string;
   notes?: string;
 }
 
@@ -59,7 +60,6 @@ export default function AdminAppointmentModal({
 }: AdminAppointmentModalProps) {
   const queryClient = useQueryClient();
   const isEditing = !!editingAppointment;
-
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const methods = useForm<FormData>({ mode: 'onChange' });
@@ -69,7 +69,6 @@ export default function AdminAppointmentModal({
     formState: { isSubmitting, isValid },
   } = methods;
 
-  // On open, prefill if editing, or use defaults
   useEffect(() => {
     if (!isOpen) return;
 
@@ -88,7 +87,6 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else {
-      // Creating new
       const baseDateStr = defaultDate
         ? defaultDate.toISOString().split('T')[0]
         : '';
@@ -126,10 +124,11 @@ export default function AdminAppointmentModal({
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-appointments']);
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
+      toast.success(isEditing ? 'Appointment updated!' : 'Appointment created!');
       onClose();
     },
     onError: (err: any) => {
-      alert(`Failed to save: ${err.message}`);
+      toast.error(`Failed to save appointment: ${err.message}`);
     },
   });
 
@@ -146,10 +145,11 @@ export default function AdminAppointmentModal({
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-appointments']);
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
+      toast.success('Appointment deleted!');
       onClose();
     },
     onError: (err: any) => {
-      alert(`Failed to cancel: ${err.message}`);
+      toast.error(`Failed to cancel: ${err.message}`);
     },
   });
 
@@ -185,7 +185,7 @@ export default function AdminAppointmentModal({
           <div className="px-4 py-2 bg-gray-50 border-b text-sm text-gray-700">
             <p className="font-medium">Patient:</p>
             <p>
-              {editingAppointment.user.firstName} {editingAppointment.user.lastName}{" "}
+              {editingAppointment.user.firstName} {editingAppointment.user.lastName}{' '}
               (<span className="text-gray-600">{editingAppointment.user.email}</span>)
             </p>
             <p className="mt-1">
@@ -254,7 +254,6 @@ export default function AdminAppointmentModal({
   );
 }
 
-/** Combine date + time => ISO string */
 function buildIsoString(dateStr: string, timeStr: string) {
   if (!dateStr || !timeStr) return '';
   const [year, month, day] = dateStr.split('-').map(Number);

@@ -1,4 +1,5 @@
-// src/pages/Profile/EditProfileModal.tsx
+// File: /src/pages/Profile/EditProfileModal.tsx
+
 import { X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import Button from '../../components/UI/Button';
@@ -6,6 +7,7 @@ import Input from '../../components/UI/Input';
 import { useAuthStore } from '../../store/authStore';
 import { updateCurrentUser } from '../../lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';  // <-- Import toast
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -37,7 +39,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     },
   });
 
-  // We’ll transform to snake_case before sending to the API
+  // We'll transform to snake_case before sending to the API
   const mutation = useMutation({
     mutationFn: (data: ProfileFormData) => {
       const payload = {
@@ -53,10 +55,11 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       const updatedUser = response.data;
       setAuth(updatedUser, localStorage.getItem('token') || '');
       queryClient.invalidateQueries(['user']);
+      toast.success('Profile updated successfully!'); // <-- Toast on success
       onClose();
     },
     onError: (err: any) => {
-      alert(`Failed to update profile: ${err.message}`);
+      toast.error(`Failed to update profile: ${err.message}`); // <-- Toast on error
     },
   });
 

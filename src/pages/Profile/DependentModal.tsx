@@ -8,6 +8,7 @@ import Input from '../../components/UI/Input';
 import { Dependent } from '../../types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createDependent, updateDependent } from '../../lib/api';
+import toast from 'react-hot-toast'; // <-- Import toast
 
 interface DependentModalProps {
   isOpen: boolean;
@@ -44,10 +45,6 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
       reset({
         firstName: dependent.firstName,
         lastName: dependent.lastName,
-        /**
-         * Ensure that `dependent.dateOfBirth` is something like "2025-01-02"
-         * If it's null or blank, pass '' so the field is empty.
-         */
         dateOfBirth: dependent.dateOfBirth || '',
       });
     } else {
@@ -73,15 +70,15 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['dependents']); // Refresh the list
+      toast.success(dependent ? 'Dependent updated!' : 'Dependent added!');
       onClose();
     },
     onError: (err: any) => {
-      alert(`Failed to save dependent: ${err.message}`);
+      toast.error(`Failed to save dependent: ${err.message}`);
     },
   });
 
   const onSubmit = (data: FormData) => {
-    // data.dateOfBirth will be "YYYY-MM-DD" from the browser
     mutation.mutate(data);
   };
 
@@ -115,7 +112,7 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
           />
 
           <Input
-            type="date" // KEY: ensures an ISO date string in "YYYY-MM-DD"
+            type="date"
             label="Date of Birth"
             {...register('dateOfBirth', { required: 'Date of birth is required' })}
             error={errors.dateOfBirth?.message}

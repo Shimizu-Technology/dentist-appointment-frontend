@@ -8,6 +8,7 @@ import { cancelAppointment } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
 import AdminAppointmentModal from './AdminAppointmentModal';
 import type { Appointment } from '../../../types';
+import toast from 'react-hot-toast';
 
 interface AdminAppointmentCardProps {
   appointment: Appointment;
@@ -15,8 +16,6 @@ interface AdminAppointmentCardProps {
 
 export default function AdminAppointmentCard({ appointment }: AdminAppointmentCardProps) {
   const queryClient = useQueryClient();
-
-  // For opening the AdminAppointmentModal (in “edit” mode)
   const [showEditModal, setShowEditModal] = useState(false);
 
   // Cancel mutation
@@ -25,9 +24,10 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-appointments']);
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
+      toast.success('Appointment cancelled successfully!');
     },
     onError: (error: any) => {
-      alert(`Failed to cancel: ${error.message}`);
+      toast.error(`Failed to cancel appointment: ${error.message}`);
     },
   });
 
@@ -37,7 +37,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     handleCancel();
   };
 
-  // Parse date/time safely
   let parsedDate: Date | null = null;
   try {
     parsedDate = new Date(appointment.appointmentTime);
@@ -48,7 +47,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     parsedDate = null;
   }
 
-  // Display a color-coded badge for appointment status
   const statusColors: Record<string, string> = {
     scheduled: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
@@ -111,7 +109,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
 
       {/* Actions row */}
       <div className="flex space-x-4">
-        {/* Instead of a prompt, show our “Appointment Form” in a modal */}
         {appointment.status === 'scheduled' && (
           <Button
             variant="outline"
@@ -123,7 +120,6 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           </Button>
         )}
 
-        {/* Cancel only if scheduled */}
         {appointment.status === 'scheduled' && (
           <Button
             variant="secondary"
@@ -137,11 +133,11 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
         )}
       </div>
 
-      {/* This is our unified "edit" modal */}
+      {/* Edit modal */}
       <AdminAppointmentModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        editingAppointment={appointment} // Pre-fills data
+        editingAppointment={appointment}
       />
     </div>
   );

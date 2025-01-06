@@ -1,3 +1,5 @@
+// File: /src/pages/Admin/Dashboard/AppointmentTypeModal.tsx
+
 import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
 import Button from '../../../components/UI/Button';
@@ -5,6 +7,7 @@ import Input from '../../../components/UI/Input';
 import { AppointmentType } from '../../../types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createAppointmentType, updateAppointmentType } from '../../../lib/api';
+import toast from 'react-hot-toast';
 
 interface AppointmentTypeModalProps {
   isOpen: boolean;
@@ -43,19 +46,27 @@ export default function AppointmentTypeModal({
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       if (appointmentType) {
-        // Update existing appointment type
+        // Update existing
         return updateAppointmentType(appointmentType.id, data);
       } else {
-        // Create a new appointment type
+        // Create new
         return createAppointmentType(data);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['appointment-types']);
+      toast.success(
+        appointmentType ? 'Appointment type updated!' : 'New appointment type created!'
+      );
       onClose();
     },
     onError: (err: any) => {
-      alert(`Error saving appointment type: ${err.message}`);
+      const errors = err?.response?.data?.errors;
+      if (Array.isArray(errors) && errors.length) {
+        toast.error(`Failed to save type: ${errors.join(', ')}`);
+      } else {
+        toast.error(`Failed to save type: ${err.message}`);
+      }
     },
   });
 

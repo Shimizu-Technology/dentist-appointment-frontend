@@ -4,8 +4,9 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createAppointment } from '../../../lib/api';
-import { getDependents } from '../../../lib/api';  // So we can fetch user’s dependents
+import { getDependents } from '../../../lib/api';
 import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';   // <-- Import the toast function
 import Button from '../../../components/UI/Button';
 import { formatAppointmentDate } from '../../../utils/dates';
 
@@ -13,7 +14,7 @@ import DentistSelect from './components/DentistSelect';
 import AppointmentTypeSelect from './components/AppointmentTypeSelect';
 import DatePicker from './components/DatePicker';
 import TimeSlotPicker from './components/TimeSlotPicker';
-import type { Dependent, Appointment } from '../../../types';
+import type { Dependent } from '../../../types';
 
 interface AppointmentFormData {
   who: string;  // "self" or a dependent ID
@@ -28,20 +29,20 @@ export default function NewAppointmentForm() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // (1) Fetch the user’s dependents so we can list them
+  // 1) Fetch user’s dependents
   const { data: dependents = [], isLoading: depsLoading } = useQuery<Dependent[]>({
     queryKey: ['dependents'],
     queryFn: async () => {
       const res = await getDependents();
-      return res.data; // shape: Dependent[]
+      return res.data; // array of Dependent objects
     },
   });
 
-  // (2) Setup the form
+  // 2) Initialize the form
   const methods = useForm<AppointmentFormData>({
     mode: 'onChange',
     defaultValues: {
-      who: 'self',  // default to “myself”
+      who: 'self',
       dentist_id: '',
       appointment_type_id: '',
       appointment_date: '',
@@ -49,45 +50,63 @@ export default function NewAppointmentForm() {
       notes: '',
     },
   });
+  const {
+    handleSubmit,
+    formState: { isSubmitting, isValid },
+  } = methods;
 
-  const { handleSubmit, formState: { isSubmitting, isValid } } = methods;
-
-  // (3) Mutation to create the appointment
+  // 3) React Query mutation for creating an appointment
   const { mutateAsync } = useMutation({
-    mutationFn: async (data: AppointmentFormData) => {
-      // Turn date + time into an ISO string
-      const isoString = formatAppointmentDate(data.appointment_date, data.appointment_time);
+    mutationFn: async (formData: AppointmentFormData) => {
+      // Convert date + time into an ISO string
+      const isoString = formatAppointmentDate(
+        formData.appointment_date,
+        formData.appointment_time
+      );
 
-      // If the user selected "self", we do NOT pass a dependent_id
-      // If they selected a real number for "who", that’s the dependent ID.
+      // Determine if user selected "self" or dependent
       let dependentId: number | undefined;
-      if (data.who !== 'self') {
-        dependentId = Number(data.who); // “21” => 21
+      if (formData.who !== 'self') {
+        dependentId = Number(formData.who);
       }
 
-      // Build the payload (the backend expects `appointment: { ... }`)
+      // Build payload for the backend
       const payload = {
         appointment_time: isoString,
-        dentist_id: Number(data.dentist_id),
-        appointment_type_id: Number(data.appointment_type_id),
-        notes: data.notes || '',
-        // If dependentId is present, add it; else omit
+        dentist_id: Number(formData.dentist_id),
+        appointment_type_id: Number(formData.appointment_type_id),
+        notes: formData.notes || '',
         ...(dependentId ? { dependent_id: dependentId } : {}),
       };
 
+      // Actually call our createAppointment API
       return createAppointment(payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['appointments']);
-      navigate('/appointments');
     },
   });
 
-  const onSubmit = async (formData: AppointmentFormData) => {
-    await mutateAsync(formData);
+  // 4) onSubmit: handle the success/error flow
+  const onSubmit = async (data: AppointmentFormData) => {
+    try {
+      const response = await mutateAsync(data);
+      // If we get here, the appointment was created successfully
+      toast.success('Appointment created successfully!');
+      // Optionally refresh the appointments list
+      queryClient.invalidateQueries(['appointments']);
+      // Redirect the user
+      navigate('/appointments');
+    } catch (error: any) {
+      // If server returns 422, we likely have validation errors
+      // e.g., error.response?.data?.errors => ["Dentist is unavailable", ...]
+      const errors = error?.response?.data?.errors;
+      if (Array.isArray(errors) && errors.length > 0) {
+        toast.error(`Failed to create appointment: ${errors.join(', ')}`);
+      } else {
+        toast.error(`Failed to create appointment: ${error.message}`);
+      }
+    }
   };
 
-  // (4) Render
+  // 5) Render
   if (depsLoading) {
     return <p className="text-gray-500">Loading dependents...</p>;
   }
@@ -96,8 +115,7 @@ export default function NewAppointmentForm() {
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-lg p-8">
         <div className="space-y-6">
-
-          {/* Patient selection */}
+          {/* Who is the appointment for: “Myself” or “depId” */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Who is this appointment for?
@@ -107,7 +125,7 @@ export default function NewAppointmentForm() {
               className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="self">Myself</option>
-              {dependents.map(dep => (
+              {dependents.map((dep) => (
                 <option key={dep.id} value={String(dep.id)}>
                   {dep.firstName} {dep.lastName} (DOB: {dep.dateOfBirth})
                 </option>
@@ -135,6 +153,11 @@ export default function NewAppointmentForm() {
             />
           </div>
 
+          {/* 
+            6) The “Book Appointment” button 
+            Show spinner if isSubmitting = true. 
+            Our custom Button component might have a prop called `isLoading`.
+          */}
           <Button
             type="submit"
             isLoading={isSubmitting}

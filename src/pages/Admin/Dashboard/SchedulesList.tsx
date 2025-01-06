@@ -13,17 +13,17 @@ import {
 } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
 import { format, addDays } from 'date-fns';
+import toast from 'react-hot-toast'; // <-- Import toast
 
 export default function SchedulesList() {
   const queryClient = useQueryClient();
 
-  // 1) FETCH SCHEDULES (clinic hours, openDays, closedDays, dentistAvailabilities)
+  // 1) FETCH SCHEDULES
   const { data, isLoading, error } = useQuery({
     queryKey: ['schedules'],
     queryFn: async () => {
       const res = await getSchedules();
       return res.data;
-      // shape: { clinicOpenTime, clinicCloseTime, openDays, closedDays, dentistAvailabilities }
     },
   });
 
@@ -36,25 +36,21 @@ export default function SchedulesList() {
     queryKey: ['all-dentists'],
     queryFn: async () => {
       const res = await getDentists();
-      return res.data; // array of { id, firstName, lastName, ... }
+      return res.data;
     },
   });
 
-  // ----------------------------------------------------------------
   // 2) CLINIC HOURS + OPEN DAYS
-  // ----------------------------------------------------------------
   const [newOpenTime, setNewOpenTime] = useState('');
   const [newCloseTime, setNewCloseTime] = useState('');
-  // We'll store openDays as a set of numbers {0,1,2,3,4,5,6}
   const [openDays, setOpenDays] = useState<Set<number>>(new Set([1,2,3,4,5]));
 
-  // Once data loads, initialize state with existing values
   useEffect(() => {
     if (data) {
       setNewOpenTime(data.clinicOpenTime || '');
       setNewCloseTime(data.clinicCloseTime || '');
       if (Array.isArray(data.openDays)) {
-        setOpenDays(new Set(data.openDays)); 
+        setOpenDays(new Set(data.openDays));
       }
     }
   }, [data]);
@@ -67,14 +63,14 @@ export default function SchedulesList() {
     }) => updateSchedules(payload),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
+      toast.success('Clinic schedule updated!');
     },
     onError: (err: any) => {
-      alert(`Failed to update clinic hours: ${err.message}`);
+      toast.error(`Failed to update clinic hours: ${err.message}`);
     },
   });
 
   function handleToggleDay(day: number) {
-    // If day is in the set, remove it; else add it
     setOpenDays(prev => {
       const copy = new Set(prev);
       if (copy.has(day)) copy.delete(day);
@@ -83,13 +79,9 @@ export default function SchedulesList() {
     });
   }
 
-  // ----------------------------------------------------------------
-  // 3) CLOSED DAYS: SINGLE + MULTI-DAY
-  // ----------------------------------------------------------------
+  // 3) CLOSED DAYS
   const [closedDate, setClosedDate] = useState('');
   const [closedReason, setClosedReason] = useState('');
-
-  // For multi-day range
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
 
@@ -97,9 +89,10 @@ export default function SchedulesList() {
     mutationFn: (payload: { date: string; reason?: string }) => createClosedDay(payload),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
+      toast.success('Closed day added!');
     },
     onError: (err: any) => {
-      alert(`Failed to create closed day: ${err.message}`);
+      toast.error(`Failed to create closed day: ${err.message}`);
     },
   });
 
@@ -107,15 +100,16 @@ export default function SchedulesList() {
     mutationFn: (id: number) => deleteClosedDay(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
+      toast.success('Closed day deleted!');
     },
     onError: (err: any) => {
-      alert(`Failed to delete closed day: ${err.message}`);
+      toast.error(`Failed to delete closed day: ${err.message}`);
     },
   });
 
   function handleAddClosedDay() {
     if (!closedDate) {
-      alert('Please choose a date');
+      toast.error('Please choose a date');
       return;
     }
     createClosedDayMut.mutate({
@@ -128,18 +122,17 @@ export default function SchedulesList() {
 
   async function handleAddClosedDayRange() {
     if (!rangeStart || !rangeEnd) {
-      alert('Please pick a start and end date');
+      toast.error('Please pick a start and end date');
       return;
     }
     const start = new Date(rangeStart);
     const end = new Date(rangeEnd);
 
     if (start > end) {
-      alert('Start date must be <= End date');
+      toast.error('Start date must be <= End date');
       return;
     }
 
-    // Loop from start to end, day by day
     let curr = start;
     while (curr <= end) {
       const dateStr = format(curr, 'yyyy-MM-dd');
@@ -149,16 +142,12 @@ export default function SchedulesList() {
       });
       curr = addDays(curr, 1);
     }
-
-    // Clear form
     setRangeStart('');
     setRangeEnd('');
     setClosedReason('');
   }
 
-  // ----------------------------------------------------------------
   // 4) DENTIST AVAILABILITIES - CREATE
-  // ----------------------------------------------------------------
   const [selectedDentist, setSelectedDentist] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState('1');
   const [startTime, setStartTime] = useState('');
@@ -173,15 +162,16 @@ export default function SchedulesList() {
     }) => createDentistUnavailability(payload),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
+      toast.success('Dentist availability created!');
     },
     onError: (err: any) => {
-      alert(`Failed to create dentist availability: ${err.message}`);
+      toast.error(`Failed to create dentist availability: ${err.message}`);
     },
   });
 
   function handleAddAvailability() {
     if (!selectedDentist || !startTime || !endTime) {
-      alert('Please select dentist & times');
+      toast.error('Please select a dentist & start/end times');
       return;
     }
     createAvailMut.mutate({
@@ -196,9 +186,7 @@ export default function SchedulesList() {
     setEndTime('');
   }
 
-  // ----------------------------------------------------------------
-  // 5) DENTIST AVAILABILITIES - EDIT (Modal)
-  // ----------------------------------------------------------------
+  // 5) DENTIST AVAILABILITIES - EDIT
   const [editAvailModalOpen, setEditAvailModalOpen] = useState(false);
   const [editingAvail, setEditingAvail] = useState<{
     id: number;
@@ -234,9 +222,10 @@ export default function SchedulesList() {
       queryClient.invalidateQueries(['schedules']);
       setEditAvailModalOpen(false);
       setEditingAvail(null);
+      toast.success('Dentist availability updated!');
     },
     onError: (err: any) => {
-      alert(`Failed to update availability: ${err.message}`);
+      toast.error(`Failed to update availability: ${err.message}`);
     },
   });
 
@@ -250,44 +239,32 @@ export default function SchedulesList() {
     });
   }
 
-  // ----------------------------------------------------------------
   // 6) DENTIST AVAILABILITIES - DELETE
-  // ----------------------------------------------------------------
   const deleteAvailMut = useMutation({
     mutationFn: (id: number) => deleteDentistUnavailability(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
+      toast.success('Dentist availability deleted!');
     },
     onError: (err: any) => {
-      alert(`Failed to delete availability: ${err.message}`);
+      toast.error(`Failed to delete availability: ${err.message}`);
     },
   });
 
-  // ----------------------------------------------------------------
-  // 7) RENDER LOADING/ERROR STATES
-  // ----------------------------------------------------------------
   if (isLoading) return <div>Loading schedules...</div>;
   if (error) return <div className="text-red-600">Error loading schedules.</div>;
   if (!data) return null;
 
-  const { 
-    closedDays = [],
-    dentistAvailabilities = [],
-  } = data;
+  const { closedDays = [], dentistAvailabilities = [] } = data;
 
-  // Helper: find dentist name
   function dentistName(dentistId: number) {
     const d = dentistList.find((doc: any) => doc.id === dentistId);
     if (!d) return `Dentist #${dentistId}`;
     return `Dr. ${d.firstName} ${d.lastName}`;
   }
 
-  // Day name helper
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-  // ----------------------------------------------------------------
-  // UI RETURN
-  // ----------------------------------------------------------------
   return (
     <div className="space-y-8">
       {/* CLINIC HOURS + OPEN DAYS */}
@@ -297,7 +274,6 @@ export default function SchedulesList() {
           Currently: <strong>{data.clinicOpenTime}</strong> to <strong>{data.clinicCloseTime}</strong>
         </p>
 
-        {/* Open/Close Time */}
         <div className="flex items-center space-x-2">
           <input
             type="time"
@@ -315,7 +291,6 @@ export default function SchedulesList() {
           />
         </div>
 
-        {/* Open Days checkboxes */}
         <div className="mt-2">
           <p className="font-medium">Clinic Open Days:</p>
           <div className="flex flex-wrap gap-3 mt-1">
@@ -338,13 +313,13 @@ export default function SchedulesList() {
         <Button
           onClick={() => {
             if (!newOpenTime || !newCloseTime) {
-              alert('Please enter open & close times');
+              toast.error('Please enter open & close times');
               return;
             }
             updateSchedulesMut.mutate({
               clinic_open_time: newOpenTime,
               clinic_close_time: newCloseTime,
-              open_days: Array.from(openDays), // convert Set to array
+              open_days: Array.from(openDays),
             });
           }}
           isLoading={updateSchedulesMut.isLoading}
@@ -357,7 +332,6 @@ export default function SchedulesList() {
       <section className="bg-white p-4 rounded shadow space-y-4">
         <h2 className="text-xl font-semibold">Closed Days</h2>
 
-        {/* Single-day */}
         <div className="flex items-center space-x-2">
           <input
             type="date"
@@ -380,7 +354,6 @@ export default function SchedulesList() {
           </Button>
         </div>
 
-        {/* Multi-day range */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-col">
             <label className="text-sm font-medium">Range Start</label>
@@ -435,10 +408,9 @@ export default function SchedulesList() {
         )}
       </section>
 
-      {/* Dentist Availabilities */}
+      {/* DENTIST AVAILABILITIES */}
       <section className="bg-white p-4 rounded shadow space-y-4">
         <h2 className="text-xl font-semibold">Dentist Availabilities</h2>
-        {/* CREATE form */}
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={selectedDentist}
@@ -483,7 +455,6 @@ export default function SchedulesList() {
           </Button>
         </div>
 
-        {/* TABLE of existing availabilities */}
         {(!dentistAvailabilities || dentistAvailabilities.length === 0) ? (
           <p className="text-gray-500">No dentist availabilities found.</p>
         ) : (

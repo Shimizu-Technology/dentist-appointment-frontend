@@ -1,8 +1,11 @@
+// File: /src/pages/Admin/Dashboard/AppointmentTypeCard.tsx
+
 import { Clock, Edit, Trash2 } from 'lucide-react';
 import Button from '../../../components/UI/Button';
 import type { AppointmentType } from '../../../types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteAppointmentType } from '../../../lib/api';
+import toast from 'react-hot-toast';
 
 interface AppointmentTypeCardProps {
   type: AppointmentType;
@@ -16,9 +19,10 @@ export default function AppointmentTypeCard({ type, onEdit }: AppointmentTypeCar
     mutationFn: () => deleteAppointmentType(type.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointment-types'] });
+      toast.success('Appointment type deleted successfully!');
     },
     onError: (err: any) => {
-      alert(`Failed to delete: ${err.message}`);
+      toast.error(`Failed to delete type: ${err.message}`);
     },
   });
 
