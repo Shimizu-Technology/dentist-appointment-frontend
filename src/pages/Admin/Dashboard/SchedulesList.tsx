@@ -6,9 +6,9 @@ import {
   updateSchedules,
   createClosedDay,
   deleteClosedDay,
-  createDentistAvailability,
-  updateDentistAvailability,
-  deleteDentistAvailability,
+  createDentistUnavailability,
+  updateDentistUnavailability,
+  deleteDentistUnavailability,
   getDentists,
 } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
@@ -170,7 +170,7 @@ export default function SchedulesList() {
       day_of_week: number;
       start_time: string;
       end_time: string;
-    }) => createDentistAvailability(payload),
+    }) => createDentistUnavailability(payload),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
     },
@@ -225,7 +225,7 @@ export default function SchedulesList() {
       day_of_week: number;
       start_time: string;
       end_time: string;
-    }) => updateDentistAvailability(payload.id, {
+    }) => updateDentistUnavailability(payload.id, {
       day_of_week: payload.day_of_week,
       start_time: payload.start_time,
       end_time: payload.end_time,
@@ -254,7 +254,7 @@ export default function SchedulesList() {
   // 6) DENTIST AVAILABILITIES - DELETE
   // ----------------------------------------------------------------
   const deleteAvailMut = useMutation({
-    mutationFn: (id: number) => deleteDentistAvailability(id),
+    mutationFn: (id: number) => deleteDentistUnavailability(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
     },

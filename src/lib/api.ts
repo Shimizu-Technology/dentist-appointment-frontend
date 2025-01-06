@@ -3,16 +3,12 @@
 import axios from 'axios';
 import type { ClosedDay } from '../../types';
 
-/**
- * 1) Determine baseURL. Adjust if needed for your environment.
- */
+// 1) Determine baseURL. Adjust if needed for your environment.
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
   : import.meta.env.VITE_LOCAL_API_BASE_URL;
 
-/**
- * 2) Export the axios instance (named `api`).
- */
+// 2) Export the axios instance
 export const api = axios.create({
   baseURL,
 });
@@ -26,11 +22,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/**
- * For ignoring the same appointment while rescheduling,
- * your backend might accept:
- *   GET /appointments/day_appointments?dentist_id=X&date=YYYY-MM-DD&ignore_id=Y
- */
+/** Day appointments, etc... (unchanged) */
 export async function getDayAppointments(
   dentistId: number,
   date: string,
@@ -90,7 +82,6 @@ export async function getDentists() {
 }
 
 export async function getDentistAvailability(dentistId: number) {
-  // GET /dentists/:id/availabilities
   return api.get(`/dentists/${dentistId}/availabilities`);
 }
 
@@ -191,7 +182,7 @@ export async function promoteUser(userId: number) {
   return api.patch(`/users/${userId}/promote`);
 }
 
-/** 
+/**
  * Search users by name/email (Admin-only).
  * GET /users/search?q=...&page=...&per_page=...
  */
@@ -218,31 +209,42 @@ export async function deleteClosedDay(id: number) {
  * SCHEDULES (Admin-only)
  * ------------------------------------------------------------------ */
 export async function getSchedules() {
-  // GET /api/v1/schedule (singular)
   return api.get('/schedule');
 }
 
 export async function updateSchedules(data: {
   clinic_open_time: string;
   clinic_close_time: string;
+  open_days?: number[];
 }) {
-  // PATCH /api/v1/schedule (singular)
   return api.patch('/schedule', data);
 }
 
-/** If you choose to have dedicated DentistAvailability CRUD (optional) */
-export async function createDentistAvailability(data: {
+/** ------------------------------------------------------------------
+ * DENTIST AVAILABILITIES vs. UNAVAILABILITIES
+ * ------------------------------------------------------------------
+ * If you want "dentist_unavailabilities" as separate endpoints,
+ * add them here. Currently, your SchedulesList references:
+ *   createDentistUnavailability
+ *   updateDentistUnavailability
+ *   deleteDentistUnavailability
+ * so let's define those to match your backend routes:
+ */
+
+// CREATE
+export async function createDentistUnavailability(data: {
   dentist_id: number;
   day_of_week: number;
   start_time: string;
   end_time: string;
 }) {
-  return api.post('/dentist_availabilities', {
-    dentist_availability: data,
+  return api.post('/dentist_unavailabilities', {
+    dentist_unavailability: data,
   });
 }
 
-export async function updateDentistAvailability(
+// UPDATE
+export async function updateDentistUnavailability(
   id: number,
   data: {
     day_of_week: number;
@@ -250,11 +252,12 @@ export async function updateDentistAvailability(
     end_time: string;
   }
 ) {
-  return api.patch(`/dentist_availabilities/${id}`, {
-    dentist_availability: data,
+  return api.patch(`/dentist_unavailabilities/${id}`, {
+    dentist_unavailability: data,
   });
 }
 
-export async function deleteDentistAvailability(id: number) {
-  return api.delete(`/dentist_availabilities/${id}`);
+// DELETE
+export async function deleteDentistUnavailability(id: number) {
+  return api.delete(`/dentist_unavailabilities/${id}`);
 }

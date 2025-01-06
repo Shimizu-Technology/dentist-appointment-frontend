@@ -51,16 +51,13 @@ export interface Appointment {
   updatedAt: string;
   notes?: string;
 
-  /** Populated from backend if included: */
   user?: User;
   dependentId?: number;
   dependent?: Dependent;
 
-  /** Possibly included from the backend if you don’t include full user/dependent objects */
   userName?: string;
   userEmail?: string;
 
-  /** For convenience, if included: */
   dentist?: Dentist;
   appointmentType?: AppointmentType;
 }
@@ -71,4 +68,12 @@ export interface ClosedDay {
   reason?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface DentistUnavailability {
+  id: number;
+  dentistId: number;
+  date: string;       // "YYYY-MM-DD"
+  startTime: string;  // "HH:mm"
+  endTime: string;    // "HH:mm"
 }
