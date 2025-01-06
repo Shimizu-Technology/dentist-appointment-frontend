@@ -1,5 +1,4 @@
 // File: /src/pages/Admin/Dashboard/AdminCalendar.tsx
-
 import { useRef, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import FullCalendar from '@fullcalendar/react';
@@ -13,20 +12,13 @@ import interactionPlugin, {
   SelectArg,
 } from '@fullcalendar/interaction';
 
-import { getAppointments, updateAppointment } from '../../../lib/api';
-import type { Appointment } from '../../../types';
+import { getAppointments, getDentists, updateAppointment } from '../../../lib/api';
+import type { Appointment, Dentist } from '../../../types';
 import AdminAppointmentModal from './AdminAppointmentModal';
 
-/**
- * A small helper to snap durations to 15-minute increments:
- * - e.g. 15 -> 15, 20 -> 30, 32 -> 45, 50 -> 60, etc.
- */
 function snapTo15(durationInMin: number) {
   const remainder = durationInMin % 15;
-  if (remainder === 0) {
-    return durationInMin;
-  }
-  return durationInMin + (15 - remainder);
+  return remainder === 0 ? durationInMin : durationInMin + (15 - remainder);
 }
 
 interface PaginatedAppointments {
@@ -43,40 +35,37 @@ export default function AdminCalendar() {
   const calendarRef = useRef<FullCalendar>(null);
   const queryClient = useQueryClient();
 
-  // Control the modal
+  const [selectedDentistId, setSelectedDentistId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
-
-  // For creating a new appointment (date/time preselected)
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
-  // Fetch your appointments (200 for example)
-  const { data, isLoading, error } = useQuery<PaginatedAppointments>({
-    queryKey: ['admin-appointments-for-calendar'],
+  // 1) Fetch dentist list for the filter dropdown
+  const { data: dentistData = [] } = useQuery<Dentist[]>({
+    queryKey: ['dentists'],
     queryFn: async () => {
-      const response = await getAppointments(1, 200);
+      const res = await getDentists();
+      return res.data;
+    },
+  });
+
+  // 2) Fetch appointments (filtered by dentist if `selectedDentistId` is set)
+  const { data, error } = useQuery<PaginatedAppointments>({
+    queryKey: ['admin-appointments-for-calendar', selectedDentistId],
+    queryFn: async () => {
+      // If empty, means “all dentists”
+      const response = await getAppointments(1, 200, selectedDentistId);
       return response.data;
     },
   });
 
-  /**
-   * Convert each Appointment to a FullCalendar event.
-   * We use the appointment_type.duration (if available), or default to 60.
-   * Then we “snap” that duration to 15-minute increments if you want to show partial blocks
-   * or rounding. If you want EXACT partial times, do not snap, just use the real duration.
-   */
   const appointments = data?.appointments || [];
+
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-
-    // 1) Get the “real” duration from the DB. If undefined, default 60.
     const rawDuration = appt.appointmentType?.duration ?? 60;
-
-    // 2) If you want strict rounding:
-    const snappedDuration = snapTo15(rawDuration);
-
-    // 3) End time = start + snappedDuration
-    const end = new Date(start.getTime() + snappedDuration * 60_000);
+    const snapped = snapTo15(rawDuration);
+    const end = new Date(start.getTime() + snapped * 60000);
 
     return {
       id: String(appt.id),
@@ -89,12 +78,9 @@ export default function AdminCalendar() {
     };
   });
 
-  // ──────────────────────────────────────────────
-  // FULLCALENDAR EVENT HANDLERS
-  // ──────────────────────────────────────────────
-
+  // ───────────── FULLCALENDAR HANDLERS ─────────────
   const handleSelect = useCallback((info: SelectArg) => {
-    setEditingAppointment(null); 
+    setEditingAppointment(null);
     setCreateDate(info.start);
     setIsModalOpen(true);
   }, []);
@@ -125,6 +111,7 @@ export default function AdminCalendar() {
         return;
       }
 
+      // Confirm with user
       const yes = window.confirm(
         `Move appointment #${oldAppt.id} to ${newStart.toLocaleString()}?`
       );
@@ -134,66 +121,85 @@ export default function AdminCalendar() {
       }
 
       try {
+        // Attempt to patch the appointment
         await updateAppointment(oldAppt.id, {
           appointment_time: newStart.toISOString(),
         });
-        queryClient.invalidateQueries(['admin-appointments-for-calendar']);
-      } catch (err) {
-        alert('Failed to update on server. Reverting...');
+        // Refresh
+        queryClient.invalidateQueries(['admin-appointments-for-calendar', selectedDentistId]);
+      } catch (err: any) {
+        // If Rails returns { errors: [...] }, show them
+        if (err.response?.data?.errors) {
+          alert(`Could not reschedule: ${err.response.data.errors.join(' ')}`);
+        } else {
+          alert(`Could not reschedule due to a server error. Please try again.`);
+        }
         dropInfo.revert();
       }
     },
-    [queryClient]
+    [queryClient, selectedDentistId]
   );
 
-  // If you allow resizing in the calendar, handle it similarly:
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // e.g. confirm or revert
+    // If you want resizing to also patch the appointment’s new start/end, do so here.
+    // For now, we revert any resizing:
     resizeInfo.revert();
   }, []);
 
-  // Basic loading/error states
-  if (isLoading) return <div className="py-6 text-center">Loading calendar...</div>;
-  if (error) return <div className="py-6 text-red-600 text-center">Failed to load appointments.</div>;
-
-  // Optional date nav
-  const goPrev = () => calendarRef.current?.getApi().prev();
-  const goNext = () => calendarRef.current?.getApi().next();
+  // ───────────── RENDER ─────────────
+  if (error) {
+    return (
+      <div className="p-4 text-red-600">
+        Failed to load appointments. Please try again later.
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-4 flex space-x-3">
-        <button onClick={goPrev} className="px-3 py-1 border rounded">
-          Prev
-        </button>
-        <button onClick={goNext} className="px-3 py-1 border rounded">
-          Next
-        </button>
+    <div className="space-y-4">
+      {/* DENTIST FILTER */}
+      <div className="flex items-center space-x-3">
+        <label className="font-medium text-gray-700">Filter by Dentist:</label>
+        <select
+          className="border rounded-md px-3 py-2"
+          value={selectedDentistId}
+          onChange={(e) => setSelectedDentistId(e.target.value)}
+        >
+          <option value="">All Dentists</option>
+          {dentistData.map((d) => (
+            <option key={d.id} value={d.id}>
+              Dr. {d.firstName} {d.lastName}
+            </option>
+          ))}
+        </select>
       </div>
 
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
-        selectable={true}
+        selectable
         select={handleSelect}
         dateClick={handleDateClick}
         eventClick={handleEventClick}
-        editable={true}
+        editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-
-        // Here are the slot settings to show partial blocks
-        // every 15 minutes (snap to 15 but label every 30):
         slotDuration="00:15:00"
         slotLabelInterval="00:30:00"
         snapDuration="00:15:00"
-
+        slotMinTime="07:00:00"
+        slotMaxTime="22:00:00"
+        headerToolbar={{
+          left: 'prev,today,next',
+          center: 'title',
+          right: 'timeGridWeek,dayGridMonth',
+        }}
         events={events}
         height="auto"
       />
 
-      {/* Combined create/edit modal */}
+      {/* Appointment Modal (create/edit) */}
       <AdminAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

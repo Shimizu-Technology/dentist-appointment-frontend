@@ -10,17 +10,14 @@ import {
   cancelAppointment
 } from '../../../lib/api';
 
-// The same reused “New Appointment” form components:
 import DentistSelect from '../../../pages/Appointments/New/components/DentistSelect';
 import AppointmentTypeSelect from '../../../pages/Appointments/New/components/AppointmentTypeSelect';
 import DatePicker from '../../../pages/Appointments/New/components/DatePicker';
 import TimeSlotPicker from '../../../pages/Appointments/New/components/TimeSlotPicker';
 
-// For picking the user if creating a brand-new appointment
 import UserSearchSelect from './UserSearchSelect';
 import { format } from 'date-fns';
 
-// Type definitions
 interface Appointment {
   id: number;
   appointmentTime: string;
@@ -39,7 +36,9 @@ interface AdminAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   editingAppointment: Appointment | null;
-  defaultDate?: Date | null; // if you want to pass in a suggested date for new appts
+  defaultDate?: Date | null;
+  /** NEW: Let parent pass a default dentist if only one is selected */
+  defaultDentistId?: number;
 }
 
 interface FormData {
@@ -56,14 +55,13 @@ export default function AdminAppointmentModal({
   onClose,
   editingAppointment,
   defaultDate,
+  defaultDentistId,
 }: AdminAppointmentModalProps) {
   const queryClient = useQueryClient();
   const isEditing = !!editingAppointment;
 
-  // For "Select User" in the form (only for brand-new appts)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  // 1) Setup react-hook-form
   const methods = useForm<FormData>({ mode: 'onChange' });
   const {
     handleSubmit,
@@ -71,18 +69,17 @@ export default function AdminAppointmentModal({
     formState: { isSubmitting, isValid },
   } = methods;
 
-  // 2) On open, prefill form (if editing) or set defaults
+  // On open, prefill if editing, or use defaults
   useEffect(() => {
     if (!isOpen) return;
 
     if (isEditing && editingAppointment) {
-      // Fill with existing appointment data
       const dt = new Date(editingAppointment.appointmentTime);
-      const dateStr = dt.toISOString().split('T')[0]; // "YYYY-MM-DD"
-      const timeStr = dt.toTimeString().slice(0, 5);   // "HH:mm"
+      const dateStr = dt.toISOString().split('T')[0];
+      const timeStr = dt.toTimeString().slice(0, 5);
 
       reset({
-        user_id: '', // Admin might not allow changing user on an edit
+        user_id: '',
         dentist_id: String(editingAppointment.dentistId),
         appointment_type_id: String(editingAppointment.appointmentTypeId),
         appointment_date: dateStr,
@@ -90,36 +87,26 @@ export default function AdminAppointmentModal({
         notes: editingAppointment.notes || '',
       });
       setSelectedUserId(null);
-    } else if (!isEditing && defaultDate) {
-      // Creating new, but we do have a suggested date
-      const dateStr = defaultDate.toISOString().split('T')[0];
-      reset({
-        user_id: '',
-        dentist_id: '',
-        appointment_type_id: '',
-        appointment_date: dateStr,
-        appointment_time: '',
-        notes: '',
-      });
-      setSelectedUserId(null);
     } else {
-      // brand-new, no default date
+      // Creating new
+      const baseDateStr = defaultDate
+        ? defaultDate.toISOString().split('T')[0]
+        : '';
       reset({
         user_id: '',
-        dentist_id: '',
+        dentist_id: defaultDentistId ? String(defaultDentistId) : '',
         appointment_type_id: '',
-        appointment_date: '',
+        appointment_date: baseDateStr,
         appointment_time: '',
         notes: '',
       });
       setSelectedUserId(null);
     }
-  }, [isOpen, isEditing, editingAppointment, defaultDate, reset]);
+  }, [isOpen, isEditing, editingAppointment, defaultDate, reset, defaultDentistId]);
 
-  // 3) Create or Update appointment
+  // CREATE or UPDATE
   const { mutateAsync: mutateAppointment } = useMutation({
     mutationFn: async (data: FormData) => {
-      // combine date + time into a single ISO string
       const isoString = buildIsoString(data.appointment_date, data.appointment_time);
       const payload: Record<string, any> = {
         appointment_time: isoString,
@@ -127,23 +114,17 @@ export default function AdminAppointmentModal({
         appointment_type_id: parseInt(data.appointment_type_id, 10),
         notes: data.notes,
       };
-
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
       }
-
       if (isEditing && editingAppointment) {
-        // update existing
         return updateAppointment(editingAppointment.id, payload);
       } else {
-        // create new
         return createAppointment(payload);
       }
     },
     onSuccess: () => {
-      // refresh the admin appointments
       queryClient.invalidateQueries(['admin-appointments']);
-      // refresh the calendar view
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
       onClose();
     },
@@ -156,7 +137,7 @@ export default function AdminAppointmentModal({
     await mutateAppointment(data);
   };
 
-  // 4) Delete appointment if editing
+  // CANCEL (delete) if editing
   const { mutateAsync: deleteAppointmentMut } = useMutation({
     mutationFn: async () => {
       if (!editingAppointment) throw new Error('No appointment to delete');
@@ -179,20 +160,17 @@ export default function AdminAppointmentModal({
     await deleteAppointmentMut();
   };
 
-  // For display: old date/time if editing
   let originalTimeString = '';
   if (isEditing && editingAppointment) {
     const oldDateObj = new Date(editingAppointment.appointmentTime);
     originalTimeString = format(oldDateObj, 'MMMM d, yyyy h:mm aa');
   }
 
-  // Not open? Return nothing
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white w-full max-w-2xl rounded-lg shadow-md">
-        {/* Header */}
         <div className="flex justify-between items-center border-b p-4">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit Appointment' : 'Create Appointment'}
@@ -202,12 +180,12 @@ export default function AdminAppointmentModal({
           </button>
         </div>
 
-        {/* If editing, show some basic info */}
+        {/* If editing, show user + old date/time info */}
         {isEditing && editingAppointment?.user && (
           <div className="px-4 py-2 bg-gray-50 border-b text-sm text-gray-700">
-            <p className="font-medium">Patient Info:</p>
+            <p className="font-medium">Patient:</p>
             <p>
-              {editingAppointment.user.firstName} {editingAppointment.user.lastName}{' '}
+              {editingAppointment.user.firstName} {editingAppointment.user.lastName}{" "}
               (<span className="text-gray-600">{editingAppointment.user.email}</span>)
             </p>
             <p className="mt-1">
@@ -216,10 +194,9 @@ export default function AdminAppointmentModal({
           </div>
         )}
 
-        {/* 5) Wrap your form in FormProvider so that DentistSelect, TimeSlotPicker, etc. can do useFormContext() */}
         <FormProvider {...methods}>
           <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-            {/* If new appointment, let admin pick user */}
+            {/* If new, pick user */}
             {!isEditing && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -242,7 +219,6 @@ export default function AdminAppointmentModal({
               <TimeSlotPicker editingAppointmentId={editingAppointment?.id} />
             </div>
 
-            {/* Additional Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Additional Notes
@@ -250,13 +226,10 @@ export default function AdminAppointmentModal({
               <textarea
                 {...methods.register('notes')}
                 rows={4}
-                className="w-full border-gray-300 rounded-md shadow-sm
-                           focus:ring-blue-500 focus:border-blue-500"
-                placeholder="(Optional) Any special requirements or details?"
+                className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            {/* Footer actions */}
             <div className="flex justify-end space-x-4">
               {isEditing && (
                 <Button variant="danger" type="button" onClick={handleDelete}>
@@ -281,8 +254,9 @@ export default function AdminAppointmentModal({
   );
 }
 
-/** Utility: Combine date(YYYY-MM-DD) + time(HH:mm) => ISO string */
+/** Combine date + time => ISO string */
 function buildIsoString(dateStr: string, timeStr: string) {
+  if (!dateStr || !timeStr) return '';
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
   const dt = new Date(year, month - 1, day, hour, minute);

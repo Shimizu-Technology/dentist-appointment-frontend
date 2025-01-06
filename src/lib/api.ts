@@ -4,6 +4,8 @@ import axios from 'axios';
 import type { ClosedDay } from '../../types';
 
 // 1) Determine baseURL. Adjust if needed for your environment.
+//    Typically VITE_LOCAL_API_BASE_URL=http://localhost:3000/api/v1
+//    and VITE_PROD_API_BASE_URL=https://yourdomain.com/api/v1
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
   : import.meta.env.VITE_LOCAL_API_BASE_URL;
@@ -88,9 +90,19 @@ export async function getDentistAvailability(dentistId: number) {
 /** ------------------------------------------------------------------
  * APPOINTMENTS
  * ------------------------------------------------------------------ */
-export async function getAppointments(page?: number, perPage?: number) {
+
+/**
+ * Updated to accept an optional dentistId param
+ * so we can filter by dentist on the admin calendar.
+ */
+export async function getAppointments(page?: number, perPage?: number, dentistId?: number) {
   return api.get('/appointments', {
-    params: { page, per_page: perPage },
+    params: {
+      page,
+      per_page: perPage,
+      // Include the dentist_id filter if provided
+      dentist_id: dentistId,
+    },
   });
 }
 
@@ -228,7 +240,7 @@ export async function updateSchedules(data: {
  *   createDentistUnavailability
  *   updateDentistUnavailability
  *   deleteDentistUnavailability
- * so let's define those to match your backend routes:
+ * so we define those to match your backend routes:
  */
 
 // CREATE
