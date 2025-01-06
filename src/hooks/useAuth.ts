@@ -13,15 +13,12 @@ export function useAuth() {
     async (email: string, password: string) => {
       try {
         const response = await loginApi(email, password);
-        // Adjust if your backend returns { token: "...", user: {...} }
         const { user, jwt } = response.data;
         setAuth(user, jwt);
 
-        // Debugging: see if token was stored
         console.log('token in localStorage after login:', localStorage.getItem('token'));
         console.log('user in localStorage after login:', localStorage.getItem('user'));
 
-        // Redirect to home (or any page you'd like)
         navigate('/');
         return { success: true };
       } catch (error) {
@@ -34,10 +31,18 @@ export function useAuth() {
     [setAuth, navigate]
   );
 
+  // UPDATED: Accept 'phone' as an optional fifth param
   const signup = useCallback(
-    async (email: string, password: string, firstName: string, lastName: string) => {
+    async (
+      email: string,
+      password: string,
+      firstName: string,
+      lastName: string,
+      phone?: string
+    ) => {
       try {
-        const response = await signupApi(email, password, firstName, lastName);
+        // Adjust signupApi call to pass phone
+        const response = await signupApi(email, password, firstName, lastName, phone);
         const { user, jwt } = response.data;
         setAuth(user, jwt);
 

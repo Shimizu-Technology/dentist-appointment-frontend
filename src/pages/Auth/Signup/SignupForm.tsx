@@ -10,6 +10,7 @@ interface SignupFormData {
   confirmPassword: string;
   firstName: string;
   lastName: string;
+  phone: string; // NEW
 }
 
 export default function SignupForm() {
@@ -25,12 +26,15 @@ export default function SignupForm() {
   });
 
   const onSubmit = async (data: SignupFormData) => {
+    // Pass phone as the 5th argument
     const result = await signup(
       data.email,
       data.password,
       data.firstName,
-      data.lastName
+      data.lastName,
+      data.phone
     );
+
     if (!result.success) {
       setError('root', { message: result.error });
     }
@@ -57,7 +61,7 @@ export default function SignupForm() {
         {...register('email', {
           required: 'Email is required',
           pattern: {
-            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+            value: /^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$/i,
             message: 'Invalid email address',
           },
         })}
@@ -88,8 +92,23 @@ export default function SignupForm() {
         error={errors.confirmPassword?.message}
       />
 
+      {/* NEW: Phone Number field */}
+      <Input
+        label="Phone Number"
+        type="tel"
+        placeholder="(555) 123-4567"
+        {...register('phone', {
+          required: 'Phone number is required',
+          pattern: {
+            value: /^\+?[\d\s-]+$/,
+            message: 'Invalid phone number',
+          },
+        })}
+        error={errors.phone?.message}
+      />
+
       {errors.root && (
-        <p className="text-red-600 text-sm">{errors.root.message}</p>
+        <p className="text-red-600 text-sm mt-1">{errors.root.message}</p>
       )}
 
       <Button

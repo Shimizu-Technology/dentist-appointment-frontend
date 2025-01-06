@@ -44,11 +44,13 @@ export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
 
+// UPDATED: Accepts phone as an optional fifth parameter
 export async function signup(
   email: string,
   password: string,
   firstName: string,
   lastName: string,
+  phone?: string,       // <-- phone added here
   role?: string
 ) {
   return api.post('/users', {
@@ -57,6 +59,7 @@ export async function signup(
       password,
       first_name: firstName,
       last_name: lastName,
+      phone,            // <-- included in payload
       role,
     },
   });
@@ -90,7 +93,6 @@ export async function getDentistAvailability(dentistId: number) {
 /** ------------------------------------------------------------------
  * APPOINTMENTS
  * ------------------------------------------------------------------ */
-
 /**
  * Updated to accept an optional dentistId param
  * so we can filter by dentist on the admin calendar.
