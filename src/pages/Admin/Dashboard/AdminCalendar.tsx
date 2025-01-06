@@ -23,7 +23,7 @@ import {
 import type { Appointment, Dentist, ClosedDay } from '../../../types';
 import AdminAppointmentModal from './AdminAppointmentModal';
 import Button from '../../../components/UI/Button';
-import toast from 'react-hot-toast'; // optional for toasts
+import toast from 'react-hot-toast';
 
 interface PaginatedAppointments {
   appointments: Appointment[];
@@ -37,10 +37,11 @@ interface PaginatedAppointments {
 
 /** The shape of your schedule response. Adjust if needed. */
 interface SchedulesResponse {
-  clinicOpenTime: string;   // e.g. "09:00"
-  clinicCloseTime: string;  // e.g. "17:00"
-  openDays: number[];       // e.g. [0,1,2,3,4,5,6] or [1,2,3,4,5]
+  clinicOpenTime: string;
+  clinicCloseTime: string;
+  openDays: number[];
   closedDays?: any[];
+  dentistUnavailabilities: any[];
 }
 
 export default function AdminCalendar() {
@@ -58,8 +59,8 @@ export default function AdminCalendar() {
   const { data: scheduleData } = useQuery<SchedulesResponse>({
     queryKey: ['schedule-data'],
     queryFn: async () => {
-      const res = await getSchedules(); // GET /schedule
-      return res.data;                 // { clinicOpenTime, clinicCloseTime, openDays, ... }
+      const res = await getSchedules();
+      return res.data;
     },
   });
 
@@ -76,14 +77,13 @@ export default function AdminCalendar() {
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
-      // Convert selectedDentistId to a number if set, else show all
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
       const response = await getAppointments(1, 200, dentistIdNum);
-      return response.data; // shape: { appointments: [...], meta: {...} }
+      return response.data;
     },
   });
 
-  /** 4) FETCH closed days so we can highlight them in gray */
+  // closed days
   const { data: closedData = [] } = useQuery<ClosedDay[]>({
     queryKey: ['closed-days'],
     queryFn: async () => {
@@ -92,23 +92,17 @@ export default function AdminCalendar() {
     },
   });
 
-  // Build up the “normal” events from your appointments
+  // Build up events
   const appointments = apptData?.appointments || [];
-
-  // ***** CHANGED: Filter out any `status === 'cancelled'`. *****
-  const activeAppointments = appointments.filter((appt) => appt.status !== 'cancelled');
+  // Filter out canceled from the calendar entirely (if that’s what you decided).
+  const activeAppointments = appointments.filter((a) => a.status !== 'cancelled');
 
   const events = activeAppointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    const dur = appt.appointmentType?.duration ?? 60; // default 60 if missing
+    const dur = appt.appointmentType?.duration ?? 60;
     const end = new Date(start.getTime() + dur * 60_000);
-
-    // Color them by status
-    let backgroundColor = '#86efac'; // for scheduled
-    if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd'; // light blue
-    }
-    // no 'cancelled' color needed, since we filter them out above
+    let backgroundColor = '#86efac'; // scheduled
+    if (appt.status === 'completed') backgroundColor = '#93c5fd';
 
     return {
       id: String(appt.id),
@@ -123,9 +117,9 @@ export default function AdminCalendar() {
     };
   });
 
-  // Also add “background event” for each closed day, to highlight them
+  // Also add background events for closed days
   const closedEvents = closedData.map((cd) => ({
-    start: cd.date, // treat as an all-day block
+    start: cd.date,
     end: cd.date,
     allDay: true,
     display: 'background',
@@ -136,10 +130,7 @@ export default function AdminCalendar() {
 
   const allEvents = [...events, ...closedEvents];
 
-  // ─────────────────────────────────────────────────────────────────
-  //    FULLCALENDAR handlers
-  // ─────────────────────────────────────────────────────────────────
-
+  // FULLCALENDAR handlers
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -153,7 +144,6 @@ export default function AdminCalendar() {
   }, []);
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
-    // If background event => it’s a closed day
     if (clickInfo.event.display === 'background') {
       return;
     }
@@ -167,12 +157,10 @@ export default function AdminCalendar() {
 
   const handleEventDrop = useCallback(
     async (dropInfo: EventDropArg) => {
-      // If background event => revert
       if (dropInfo.event.display === 'background') {
         dropInfo.revert();
         return;
       }
-
       const { event } = dropInfo;
       const appt = event.extendedProps.appointment as Appointment;
       if (!appt || !event.start) {
@@ -186,7 +174,6 @@ export default function AdminCalendar() {
         dropInfo.revert();
         return;
       }
-
       try {
         await updateAppointment(appt.id, {
           appointment_time: event.start.toISOString(),
@@ -201,7 +188,7 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // We do not support resizing to change end times, so revert
+    // Not supporting resizing changes, revert
     resizeInfo.revert();
   }, []);
 
@@ -213,12 +200,11 @@ export default function AdminCalendar() {
     );
   }
 
-  // If schedule not loaded, fall back to defaults
-  const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5];
+  const openDays = scheduleData?.openDays ?? [1,2,3,4,5];
   const openTime = scheduleData?.clinicOpenTime ?? '09:00';
   const closeTime = scheduleData?.clinicCloseTime ?? '17:00';
 
-  // A little color dot for the legend
+  // A color dot for the legend
   function ColorDot({ color }: { color: string }) {
     return <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: color }} />;
   }
@@ -242,7 +228,7 @@ export default function AdminCalendar() {
         </select>
       </div>
 
-      {/* LEGEND (If you want to show statuses) */}
+      {/* LEGEND */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
           <ColorDot color="#86efac" />
@@ -256,7 +242,6 @@ export default function AdminCalendar() {
           <ColorDot color="#d1d5db" />
           <span>Closed Day</span>
         </div>
-        {/* Removed "cancelled" entry since we are not showing them */}
       </div>
 
       <FullCalendar
@@ -270,10 +255,11 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        slotMinTime="06:00:00"      // set earliest hour to 6am (example)
-        slotMaxTime="21:00:00"      // set latest hour to 9pm (example)
-        slotDuration="00:15:00"     // 15-min increments, if you like
-        snapDuration="00:15:00"
+        // IMPORTANT: 15-min increments
+        slotMinTime="06:00:00"      
+        slotMaxTime="21:00:00"
+        slotDuration="00:15:00"     // <--- 15-min increments
+        snapDuration="00:15:00"     // <--- also snap to 15 min
         displayEventTime
         headerToolbar={{
           left: 'prev,today,next',
@@ -289,7 +275,7 @@ export default function AdminCalendar() {
         height="auto"
       />
 
-      {/* AdminAppointmentModal handles create/update of an appointment */}
+      {/* Modal for create or edit */}
       <AdminAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
