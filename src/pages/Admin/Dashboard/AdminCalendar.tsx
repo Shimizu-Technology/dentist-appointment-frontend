@@ -23,7 +23,7 @@ import {
 import type { Appointment, Dentist, ClosedDay } from '../../../types';
 import AdminAppointmentModal from './AdminAppointmentModal';
 import Button from '../../../components/UI/Button';
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'; // optional for toasts
 
 interface PaginatedAppointments {
   appointments: Appointment[];
@@ -40,7 +40,7 @@ interface SchedulesResponse {
   clinicOpenTime: string;   // e.g. "09:00"
   clinicCloseTime: string;  // e.g. "17:00"
   openDays: number[];       // e.g. [0,1,2,3,4,5,6] or [1,2,3,4,5]
-  closedDays?: any[];       // not strictly needed; we fetch them separately
+  closedDays?: any[];
 }
 
 export default function AdminCalendar() {
@@ -58,8 +58,8 @@ export default function AdminCalendar() {
   const { data: scheduleData } = useQuery<SchedulesResponse>({
     queryKey: ['schedule-data'],
     queryFn: async () => {
-      const res = await getSchedules();
-      return res.data;
+      const res = await getSchedules(); // GET /schedule
+      return res.data;                 // { clinicOpenTime, clinicCloseTime, openDays, ... }
     },
   });
 
@@ -88,25 +88,27 @@ export default function AdminCalendar() {
     queryKey: ['closed-days'],
     queryFn: async () => {
       const res = await getClosedDays();
-      return res.data; // e.g. [{ id, date: "2025-01-10", reason: "Holiday" }, ...]
+      return res.data;
     },
   });
 
   // Build up the “normal” events from your appointments
   const appointments = apptData?.appointments || [];
-  const events = appointments.map((appt) => {
+
+  // ***** CHANGED: Filter out any `status === 'cancelled'`. *****
+  const activeAppointments = appointments.filter((appt) => appt.status !== 'cancelled');
+
+  const events = activeAppointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    // The duration from appt type, default 60 if missing
-    const dur = appt.appointmentType?.duration ?? 60;
+    const dur = appt.appointmentType?.duration ?? 60; // default 60 if missing
     const end = new Date(start.getTime() + dur * 60_000);
 
     // Color them by status
-    let backgroundColor = '#86efac'; // default green
-    if (appt.status === 'cancelled') {
-      backgroundColor = '#fca5a5'; // Red
-    } else if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd'; // Blue
+    let backgroundColor = '#86efac'; // for scheduled
+    if (appt.status === 'completed') {
+      backgroundColor = '#93c5fd'; // light blue
     }
+    // no 'cancelled' color needed, since we filter them out above
 
     return {
       id: String(appt.id),
@@ -121,24 +123,23 @@ export default function AdminCalendar() {
     };
   });
 
-  // Also add a “background event” for each closed day
+  // Also add “background event” for each closed day, to highlight them
   const closedEvents = closedData.map((cd) => ({
-    // If date is "2025-01-15", treat it as an all-day block
-    start: cd.date, // "YYYY-MM-DD"
+    start: cd.date, // treat as an all-day block
     end: cd.date,
     allDay: true,
     display: 'background',
     backgroundColor: '#d1d5db', // gray-300
     title: cd.reason || 'Closed Day',
-    overlap: false, // so it won't overlap with appt events
+    overlap: false,
   }));
 
-  // Combine them
   const allEvents = [...events, ...closedEvents];
 
   // ─────────────────────────────────────────────────────────────────
   //    FULLCALENDAR handlers
   // ─────────────────────────────────────────────────────────────────
+
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -152,8 +153,8 @@ export default function AdminCalendar() {
   }, []);
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
+    // If background event => it’s a closed day
     if (clickInfo.event.display === 'background') {
-      // That means user clicked a closed day block => ignore
       return;
     }
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
@@ -178,7 +179,6 @@ export default function AdminCalendar() {
         dropInfo.revert();
         return;
       }
-      // Confirm with user
       const yes = window.confirm(
         `Move appointment #${appt.id} to ${event.start.toLocaleString()}?`
       );
@@ -192,7 +192,6 @@ export default function AdminCalendar() {
           appointment_time: event.start.toISOString(),
         });
         queryClient.invalidateQueries(['admin-appointments-for-calendar', selectedDentistId]);
-        toast.success('Appointment rescheduled successfully!');
       } catch (err: any) {
         toast.error('Could not reschedule appointment.');
         dropInfo.revert();
@@ -202,7 +201,7 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // If you want resizing to update the apt endTime => do so. Otherwise revert.
+    // We do not support resizing to change end times, so revert
     resizeInfo.revert();
   }, []);
 
@@ -214,12 +213,12 @@ export default function AdminCalendar() {
     );
   }
 
-  // Provide fallback if scheduleData is not loaded yet
-  const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5]; // Mon-Fri
+  // If schedule not loaded, fall back to defaults
+  const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5];
   const openTime = scheduleData?.clinicOpenTime ?? '09:00';
   const closeTime = scheduleData?.clinicCloseTime ?? '17:00';
 
-  // A small color dot for the legend
+  // A little color dot for the legend
   function ColorDot({ color }: { color: string }) {
     return <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: color }} />;
   }
@@ -243,15 +242,11 @@ export default function AdminCalendar() {
         </select>
       </div>
 
-      {/* LEGEND */}
+      {/* LEGEND (If you want to show statuses) */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
           <ColorDot color="#86efac" />
           <span>Scheduled</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <ColorDot color="#fca5a5" />
-          <span>Cancelled</span>
         </div>
         <div className="flex items-center gap-1">
           <ColorDot color="#93c5fd" />
@@ -261,6 +256,7 @@ export default function AdminCalendar() {
           <ColorDot color="#d1d5db" />
           <span>Closed Day</span>
         </div>
+        {/* Removed "cancelled" entry since we are not showing them */}
       </div>
 
       <FullCalendar
@@ -274,40 +270,26 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        // Show half-hour or quarter-hour slots if you like:
-        slotDuration="00:15:00"
-        snapDuration="00:30:00"
-        // Start at 8 AM, end at 9 PM
-        slotMinTime="08:00:00"
-        slotMaxTime="21:00:00"
+        slotMinTime="06:00:00"      // set earliest hour to 6am (example)
+        slotMaxTime="21:00:00"      // set latest hour to 9pm (example)
+        slotDuration="00:15:00"     // 15-min increments, if you like
+        snapDuration="00:15:00"
+        displayEventTime
         headerToolbar={{
           left: 'prev,today,next',
           center: 'title',
           right: 'timeGridWeek,dayGridMonth',
         }}
-        // businessHours from your schedule
         businessHours={{
           daysOfWeek: openDays,
           startTime: openTime,
           endTime: closeTime,
         }}
-        displayEventTime
-        // Use 12-hour format for events
-        eventTimeFormat={{
-          hour: 'numeric',
-          minute: '2-digit',
-          meridiem: 'short', // e.g. "AM"/"PM"
-        }}
-        // Also label the time slots in 12-hour format
-        slotLabelFormat={{
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        }}
         events={allEvents}
         height="auto"
       />
 
+      {/* AdminAppointmentModal handles create/update of an appointment */}
       <AdminAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

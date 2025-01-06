@@ -1,4 +1,5 @@
 // File: /src/pages/Appointments/New/components/TimeSlotPicker.tsx
+
 import { useMemo } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
@@ -10,6 +11,13 @@ import { format } from 'date-fns'; // We'll use `format` to display 12h times
 
 interface TimeSlotPickerProps {
   editingAppointmentId?: number;
+}
+
+interface DayAppointment {
+  id: number;
+  appointmentTime: string;
+  duration: number;
+  status: 'scheduled' | 'completed' | 'cancelled';
 }
 
 interface DentistUnavailability {
@@ -30,7 +38,7 @@ interface SchedulesResponse {
   clinicOpenTime: string;     // e.g. "09:00"
   clinicCloseTime: string;    // e.g. "17:00"
   openDays: number[];         // e.g. [1,2,3,4,5]
-  closedDays: ClosedDay[]; 
+  closedDays: ClosedDay[];
   dentistUnavailabilities: DentistUnavailability[];
 }
 
@@ -50,15 +58,15 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
       const res = await getSchedules();
       return res.data;
     },
-    // Only call once or keep enabled
   });
 
   // 2) Query the day’s appointments for that dentist/date
-  const { data: dayAppointments = [] } = useQuery<any[]>({
+  const { data: dayAppointments = [] } = useQuery<DayAppointment[]>({
     queryKey: ['day-appointments', dentistId, appointmentDate, editingAppointmentId],
     queryFn: async () => {
       if (!dentistId || !appointmentDate) return [];
       const res = await getDayAppointments(Number(dentistId), appointmentDate, editingAppointmentId);
+      // res.data.appointments is an array of { id, appointmentTime, duration, status }
       return res.data.appointments || [];
     },
     enabled: Boolean(dentistId && appointmentDate),
@@ -140,8 +148,11 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
       });
       if (hasBlockOverlap) return false;
 
-      // (b) Check overlap with scheduled appointments
-      const hasApptOverlap = dayAppointments.some(appt => {
+      // (b) Check overlap with SCHEDULED appointments (ignore cancelled):
+      // Filter out 'cancelled' (and possibly 'completed' if it shouldn’t block).
+      const activeAppointments = dayAppointments.filter(appt => appt.status !== 'cancelled');
+
+      const hasApptOverlap = activeAppointments.some(appt => {
         const apptStart = new Date(appt.appointmentTime);
         const apptDur   = appt.duration ?? 30;
         const apptEnd   = new Date(apptStart.getTime() + apptDur * 60_000);
