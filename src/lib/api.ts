@@ -24,7 +24,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/** Day appointments, etc... (unchanged) */
+/** 
+ * ---------------------------------------------------------------
+ * DAY APPOINTMENTS
+ * ---------------------------------------------------------------
+ */
 export async function getDayAppointments(
   dentistId: number,
   date: string,
@@ -37,9 +41,11 @@ export async function getDayAppointments(
   return api.get('/appointments/day_appointments', { params });
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * AUTH / SESSIONS
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
@@ -50,7 +56,7 @@ export async function signup(
   password: string,
   firstName: string,
   lastName: string,
-  phone?: string,       // <-- phone added here
+  phone?: string,
   role?: string
 ) {
   return api.post('/users', {
@@ -59,15 +65,17 @@ export async function signup(
       password,
       first_name: firstName,
       last_name: lastName,
-      phone,            // <-- included in payload
+      phone,
       role,
     },
   });
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * CURRENT USER
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function updateCurrentUser(data: {
   first_name?: string;
   last_name?: string;
@@ -79,9 +87,11 @@ export async function updateCurrentUser(data: {
   });
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * DENTISTS
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function getDentists() {
   return api.get('/dentists');
 }
@@ -90,19 +100,24 @@ export async function getDentistAvailability(dentistId: number) {
   return api.get(`/dentists/${dentistId}/availabilities`);
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * APPOINTMENTS
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 /**
  * Updated to accept an optional dentistId param
  * so we can filter by dentist on the admin calendar.
  */
-export async function getAppointments(page?: number, perPage?: number, dentistId?: number) {
+export async function getAppointments(
+  page?: number,
+  perPage?: number,
+  dentistId?: number
+) {
   return api.get('/appointments', {
     params: {
       page,
       per_page: perPage,
-      // Include the dentist_id filter if provided
       dentist_id: dentistId,
     },
   });
@@ -120,9 +135,23 @@ export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
 }
 
-/** ------------------------------------------------------------------
+/**
+ * NEXT AVAILABLE: fetch the earliest free slots (Admin “Better Tools”).
+ * Example: GET /appointments/next_available?dentistId=...&appointmentTypeId=...&limit=...
+ */
+export async function getNextAvailable(params: {
+  dentistId?: number;
+  appointmentTypeId?: number;
+  limit?: number;
+}) {
+  return api.get('/appointments/next_available', { params });
+}
+
+/** 
+ * ---------------------------------------------------------------
  * APPOINTMENT TYPES
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
@@ -146,9 +175,11 @@ export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * DEPENDENTS
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function getDependents() {
   return api.get('/dependents');
 }
@@ -168,9 +199,11 @@ export async function updateDependent(
   return api.patch(`/dependents/${dependentId}`, { dependent: data });
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * INSURANCE (Update as part of user data)
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function updateInsurance(insuranceData: {
   providerName: string;
   policyNumber: string;
@@ -185,9 +218,11 @@ export async function updateInsurance(insuranceData: {
   });
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * USERS (Admin-only)
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function getUsers(page = 1, perPage = 10) {
   return api.get('/users', { params: { page, per_page: perPage } });
 }
@@ -204,9 +239,11 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
   return api.get('/users/search', { params: { q: query, page, per_page: perPage } });
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * CLOSED DAYS
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function getClosedDays() {
   return api.get<ClosedDay[]>('/closed_days');
 }
@@ -219,9 +256,11 @@ export async function deleteClosedDay(id: number) {
   return api.delete(`/closed_days/${id}`);
 }
 
-/** ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
  * SCHEDULES (Admin-only)
- * ------------------------------------------------------------------ */
+ * ---------------------------------------------------------------
+ */
 export async function getSchedules() {
   return api.get('/schedule');
 }
@@ -234,9 +273,10 @@ export async function updateSchedules(data: {
   return api.patch('/schedule', data);
 }
 
-/** ------------------------------------------------------------------
- * DENTIST AVAILABILITIES vs. UNAVAILABILITIES
- * ------------------------------------------------------------------
+/** 
+ * ---------------------------------------------------------------
+ * DENTIST UNAVAILABILITIES
+ * ---------------------------------------------------------------
  * If you want "dentist_unavailabilities" as separate endpoints,
  * add them here. Currently, your SchedulesList references:
  *   createDentistUnavailability

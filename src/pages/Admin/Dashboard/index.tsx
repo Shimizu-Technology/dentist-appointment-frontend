@@ -8,6 +8,9 @@ import DashboardHeader from './DashboardHeader';
 import AdminCalendar from './AdminCalendar';
 import SchedulesList from './SchedulesList';
 
+// NEW IMPORT
+import NextAvailableTool from './NextAvailableTool'; // We'll define this component next
+
 export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -21,6 +24,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="schedules">Schedules</TabsTrigger>
+
+            {/* NEW TAB: Next Available */}
+            <TabsTrigger value="next-available">Next Available</TabsTrigger>
           </TabsList>
 
           <TabsContent value="appointments">
@@ -41,6 +47,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="schedules">
             <SchedulesList />
+          </TabsContent>
+
+          <TabsContent value="next-available">
+            <NextAvailableTool />
           </TabsContent>
         </Tabs>
       </div>

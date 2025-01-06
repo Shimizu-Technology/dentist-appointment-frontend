@@ -23,8 +23,6 @@ This project is a **React + TypeScript + Vite** front-end for the **ISA Dental**
 - **npm** (or **yarn**)  
 - **Vite** build tool (automatically used when you run the scripts)  
 
-_(Also recommended to run the [ISA Dental Backend](https://github.com/your-organization/dentist-appointment-backend) API for real data. If you don’t have the API running, you can use the mock data approach that’s included.)_
-
 ---
 
 ## Installation and Setup
@@ -55,14 +53,14 @@ dentist-appointment-frontend
 ├─ public/               # Static assets (favicon, etc.)
 ├─ src/                  # Application source code
 │  ├─ components/        # Reusable React components
-│  ├─ pages/             # Page-level components (e.g., /login, /appointments)
-│  ├─ hooks/             # Custom React hooks (e.g., useAuth, useInsurance)
-│  ├─ lib/               # API calls, mockData, and utility functions
+│  ├─ pages/             # Page-level components (e.g. /login, /appointments)
+│  ├─ hooks/             # Custom React hooks (e.g. useAuth, useInsurance)
+│  ├─ lib/               # API calls, and utility functions
 │  ├─ store/             # Zustand store for auth state
 │  ├─ types/             # TypeScript type definitions
 │  ├─ App.tsx            # Main application routes
 │  └─ main.tsx           # Entry point
-├─ .env                  # Environment variables (e.g., API_BASE_URL)
+├─ .env                  # Environment variables
 ├─ package.json          # Scripts, dependencies, etc.
 ├─ tailwind.config.js    # Tailwind CSS config
 ├─ tsconfig.json         # TypeScript config
@@ -83,15 +81,16 @@ dentist-appointment-frontend
 
    By default, this will launch on **http://localhost:5173** (or the next available port).
 
-2. **Open the browser** to see the site.  
-   - You can log in with test credentials (if using mock data or your backend’s seeded data).
+2. **Open your browser** to see the site.  
+   - If you have the backend running locally (default at **http://localhost:3000**), everything should connect automatically if your `.env` is set to point to it.
 
-3. **Sign in / Sign up** as a user or use existing test credentials. Once authenticated, you can:  
-   - View and book appointments (including picking a date, time slot, etc.).  
+3. **Sign in / Sign up** with test credentials or create a new user. Once authenticated, you can:  
+   - View and book appointments (including picking a date + time slot).  
    - Manage dependents.  
    - Update insurance information.  
    - **(If admin)** Access the Admin Dashboard to manage:
      - **Appointments** (view/cancel/reschedule all)
+       - Includes a FullCalendar-based UI for scheduling
      - **Appointment Types** (CRUD)
      - **Users** (see all users, optionally promote them to admin)
 
@@ -99,15 +98,27 @@ dentist-appointment-frontend
 
 ## Environment Variables
 
-By default, the client looks for environment variables in `.env`:
+By default, the client looks for environment variables in an `.env` file at the root of the project. The two primary variables are:
 
-- **`API_BASE_URL`**: The base URL for the ISA Dental backend API.  
-  Example:  
+- **`VITE_LOCAL_API_BASE_URL`** — e.g.,  
+  ```bash
+  VITE_LOCAL_API_BASE_URL=http://localhost:3000/api/v1
   ```
-  API_BASE_URL=http://localhost:3000/api/v1
+- **`VITE_PROD_API_BASE_URL`** — e.g.,  
+  ```bash
+  VITE_PROD_API_BASE_URL=https://dentist-appointment-backend.onrender.com/api/v1
   ```
 
-Make sure this matches the address of your running backend API (Rails, Docker, etc.). If not set, it defaults to `http://localhost:3000/api/v1`.
+> The app will detect if `import.meta.env.PROD` is `true` (i.e., production mode) and use `VITE_PROD_API_BASE_URL`. Otherwise, it defaults to `VITE_LOCAL_API_BASE_URL`.
+
+If for any reason you don’t provide these variables, our code will **default** to `http://localhost:3000/api/v1`.
+
+Example `.env`:
+
+```
+VITE_LOCAL_API_BASE_URL=http://localhost:3000/api/v1
+VITE_PROD_API_BASE_URL=https://dentist-appointment-backend.onrender.com/api/v1
+```
 
 ---
 
@@ -115,7 +126,7 @@ Make sure this matches the address of your running backend API (Rails, Docker, e
 
 Typical steps to deploy a Vite-based React app:
 
-1. **Set `API_BASE_URL`** in your hosting environment or CI/CD build system.  
+1. **Set environment variables** (`VITE_LOCAL_API_BASE_URL` and/or `VITE_PROD_API_BASE_URL`) in your hosting environment or CI/CD build system.  
 2. **Build** the production bundle:
 
    ```bash
@@ -128,17 +139,20 @@ Typical steps to deploy a Vite-based React app:
 
 3. **Deploy** those static files to a hosting provider (e.g., Netlify, Vercel, AWS S3, etc.).
 
+Ensure that the environment variable used in production is set to the correct backend URL (`VITE_PROD_API_BASE_URL`) in your platform’s environment configuration.
+
 ---
 
 ## Key Features
 
 1. **Appointments**  
    - Users can book new appointments, view upcoming ones, and cancel/reschedule if they meet the requirements (e.g., 24+ hours in advance).  
-   - Admin can view and manage all appointments.
+   - Admins can view and manage all appointments in a **FullCalendar**-based admin calendar (timeGrid or dayGrid view).  
+   - The user booking process uses **react-day-picker** to choose the date, then a time slot picker to confirm the final appointment time.
 
 2. **Dependents**  
    - Users can add/edit dependents.  
-   - Manage appointments for your dependents.
+   - Manage appointments on behalf of your dependents.
 
 3. **Insurance**  
    - Users can view/update their insurance info (provider, policy number, plan type).
@@ -146,14 +160,15 @@ Typical steps to deploy a Vite-based React app:
 4. **Admin Dashboard**  
    - Available only to users with `role === 'admin'`.  
    - **Tabs** for:
-     - **Appointments**: Admin sees all appointments site-wide.  
-     - **Appointment Types**: Create/edit/delete appointment types.  
-     - **Users**: View all user accounts.  
-       - **Promote** any user to admin role.
+     - **Appointments**: Admin sees all appointments site-wide, with the FullCalendar integration for quick drag-and-drop rescheduling.  
+     - **Appointment Types**: Create/edit/delete appointment types (duration, name, description).  
+     - **Users**: View all user accounts and optionally promote them to admin.  
+     - **Calendar**: A more comprehensive calendar view for the entire schedule, including closed days.  
+     - **Schedules**: Manage clinic open/close times, global closed days, and individual dentist unavailabilities.
 
 5. **Role-based Access**  
    - Regular users can only manage their own profile/appointments.  
-   - Admin sees + manages all appointments, appointment types, and users.
+   - Admin sees and manages all appointments, appointment types, users, schedules, and more.
 
 ---
 
@@ -164,4 +179,5 @@ Typical steps to deploy a Vite-based React app:
 - **Accessibility**: Ensure best practices for screen readers and keyboard navigation.  
 - **i18n**: Internationalization support for multiple languages.  
 - **Theming**: Support multiple color schemes or branding.  
+- **Better Admin Tools**: Precompute free slots for faster scheduling, advanced next-available-time searches, etc.  
 - **Pagination**: Additional smooth or infinite scrolling pagination for large datasets (e.g., Admin user list).  
