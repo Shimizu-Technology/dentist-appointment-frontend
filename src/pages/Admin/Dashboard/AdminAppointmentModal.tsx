@@ -1,34 +1,53 @@
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { format } from 'date-fns';
+// File: /src/pages/Admin/Dashboard/AdminAppointmentModal.tsx
+import { useState, useEffect } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
+import { X } from 'lucide-react';
+import Button from '../../../components/UI/Button';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createAppointment,
   updateAppointment,
   cancelAppointment
 } from '../../../lib/api';
+
+// The same reused “New Appointment” form components:
 import DentistSelect from '../../../pages/Appointments/New/components/DentistSelect';
 import AppointmentTypeSelect from '../../../pages/Appointments/New/components/AppointmentTypeSelect';
 import DatePicker from '../../../pages/Appointments/New/components/DatePicker';
 import TimeSlotPicker from '../../../pages/Appointments/New/components/TimeSlotPicker';
+
+// For picking the user if creating a brand-new appointment
 import UserSearchSelect from './UserSearchSelect';
-import Button from '../../../components/UI/Button';
-import { X } from 'lucide-react';
-import type { Appointment } from '../../../types';
+import { format } from 'date-fns';
+
+// Type definitions
+interface Appointment {
+  id: number;
+  appointmentTime: string;
+  dentistId: number;
+  appointmentTypeId: number;
+  notes?: string;
+  user?: {
+    id: number;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
 
 interface AdminAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   editingAppointment: Appointment | null;
-  defaultDate?: Date | null;
+  defaultDate?: Date | null; // if you want to pass in a suggested date for new appts
 }
 
 interface FormData {
   user_id?: string;
   dentist_id: string;
   appointment_type_id: string;
-  appointment_date: string;
-  appointment_time: string;
+  appointment_date: string; // "YYYY-MM-DD"
+  appointment_time: string; // "HH:mm"
   notes?: string;
 }
 
@@ -40,26 +59,30 @@ export default function AdminAppointmentModal({
 }: AdminAppointmentModalProps) {
   const queryClient = useQueryClient();
   const isEditing = !!editingAppointment;
+
+  // For "Select User" in the form (only for brand-new appts)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  // Setup react-hook-form
-  const { register, handleSubmit, watch, reset, setValue, formState } = useForm<FormData>({
-    mode: 'onChange',
-  });
-  const { errors, isSubmitting, isValid } = formState;
+  // 1) Setup react-hook-form
+  const methods = useForm<FormData>({ mode: 'onChange' });
+  const {
+    handleSubmit,
+    reset,
+    formState: { isSubmitting, isValid },
+  } = methods;
 
-  // On open, prefill
+  // 2) On open, prefill form (if editing) or set defaults
   useEffect(() => {
     if (!isOpen) return;
 
     if (isEditing && editingAppointment) {
-      // Pre-fill with the existing appointment’s values
+      // Fill with existing appointment data
       const dt = new Date(editingAppointment.appointmentTime);
-      const dateStr = dt.toISOString().split('T')[0]; // e.g. 2025-01-07
-      const timeStr = dt.toTimeString().slice(0, 5);  // e.g. 14:00
+      const dateStr = dt.toISOString().split('T')[0]; // "YYYY-MM-DD"
+      const timeStr = dt.toTimeString().slice(0, 5);   // "HH:mm"
 
       reset({
-        user_id: '', // Admin might not allow changing the user on an existing appt
+        user_id: '', // Admin might not allow changing user on an edit
         dentist_id: String(editingAppointment.dentistId),
         appointment_type_id: String(editingAppointment.appointmentTypeId),
         appointment_date: dateStr,
@@ -68,7 +91,7 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else if (!isEditing && defaultDate) {
-      // Creating new with a suggested date
+      // Creating new, but we do have a suggested date
       const dateStr = defaultDate.toISOString().split('T')[0];
       reset({
         user_id: '',
@@ -80,7 +103,7 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else {
-      // brand new, blank form
+      // brand-new, no default date
       reset({
         user_id: '',
         dentist_id: '',
@@ -93,12 +116,11 @@ export default function AdminAppointmentModal({
     }
   }, [isOpen, isEditing, editingAppointment, defaultDate, reset]);
 
-  // Create or update logic
+  // 3) Create or Update appointment
   const { mutateAsync: mutateAppointment } = useMutation({
     mutationFn: async (data: FormData) => {
-      // Combine date & time => ISO
+      // combine date + time into a single ISO string
       const isoString = buildIsoString(data.appointment_date, data.appointment_time);
-
       const payload: Record<string, any> = {
         appointment_time: isoString,
         dentist_id: parseInt(data.dentist_id, 10),
@@ -106,29 +128,35 @@ export default function AdminAppointmentModal({
         notes: data.notes,
       };
 
-      // If creating new, we can set user_id:
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
       }
 
-      // If editing
       if (isEditing && editingAppointment) {
+        // update existing
         return updateAppointment(editingAppointment.id, payload);
       } else {
+        // create new
         return createAppointment(payload);
       }
     },
     onSuccess: () => {
+      // refresh the admin appointments
       queryClient.invalidateQueries(['admin-appointments']);
+      // refresh the calendar view
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
       onClose();
     },
-    onError: (error: any) => {
-      alert(`Failed to save: ${error.message}`);
+    onError: (err: any) => {
+      alert(`Failed to save: ${err.message}`);
     },
   });
 
-  // Delete / Cancel
+  const onSubmit = async (data: FormData) => {
+    await mutateAppointment(data);
+  };
+
+  // 4) Delete appointment if editing
   const { mutateAsync: deleteAppointmentMut } = useMutation({
     mutationFn: async () => {
       if (!editingAppointment) throw new Error('No appointment to delete');
@@ -139,14 +167,10 @@ export default function AdminAppointmentModal({
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
       onClose();
     },
-    onError: (error: any) => {
-      alert(`Failed to cancel: ${error.message}`);
+    onError: (err: any) => {
+      alert(`Failed to cancel: ${err.message}`);
     },
   });
-
-  const onSubmit = async (data: FormData) => {
-    await mutateAppointment(data);
-  };
 
   const handleDelete = async () => {
     if (!editingAppointment) return;
@@ -155,19 +179,20 @@ export default function AdminAppointmentModal({
     await deleteAppointmentMut();
   };
 
-  if (!isOpen) return null;
-
-  // For display: original time
+  // For display: old date/time if editing
   let originalTimeString = '';
   if (isEditing && editingAppointment) {
     const oldDateObj = new Date(editingAppointment.appointmentTime);
     originalTimeString = format(oldDateObj, 'MMMM d, yyyy h:mm aa');
   }
 
+  // Not open? Return nothing
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white w-full max-w-2xl rounded-lg shadow-md">
-        {/* Header row */}
+        {/* Header */}
         <div className="flex justify-between items-center border-b p-4">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit Appointment' : 'Create Appointment'}
@@ -177,13 +202,13 @@ export default function AdminAppointmentModal({
           </button>
         </div>
 
-        {/* If editing: show patient + original time */}
+        {/* If editing, show some basic info */}
         {isEditing && editingAppointment?.user && (
           <div className="px-4 py-2 bg-gray-50 border-b text-sm text-gray-700">
             <p className="font-medium">Patient Info:</p>
             <p>
-              {editingAppointment.user.firstName} {editingAppointment.user.lastName}
-              {' '}(<span className="text-gray-600">{editingAppointment.user.email}</span>)
+              {editingAppointment.user.firstName} {editingAppointment.user.lastName}{' '}
+              (<span className="text-gray-600">{editingAppointment.user.email}</span>)
             </p>
             <p className="mt-1">
               <span className="font-medium">Currently scheduled:</span> {originalTimeString}
@@ -191,83 +216,66 @@ export default function AdminAppointmentModal({
           </div>
         )}
 
-        {/* Body/Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-          {/* If new appointment, let the admin pick a user */}
-          {!isEditing && (
+        {/* 5) Wrap your form in FormProvider so that DentistSelect, TimeSlotPicker, etc. can do useFormContext() */}
+        <FormProvider {...methods}>
+          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+            {/* If new appointment, let admin pick user */}
+            {!isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select User
+                </label>
+                <UserSearchSelect
+                  onSelectUser={(uid) => {
+                    methods.setValue('user_id', String(uid));
+                    setSelectedUserId(String(uid));
+                  }}
+                />
+              </div>
+            )}
+
+            <DentistSelect />
+            <AppointmentTypeSelect />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <DatePicker />
+              <TimeSlotPicker editingAppointmentId={editingAppointment?.id} />
+            </div>
+
+            {/* Additional Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Select User
+                Additional Notes
               </label>
-              <UserSearchSelect
-                onSelectUser={(uid) => {
-                  setValue('user_id', String(uid));
-                  setSelectedUserId(String(uid));
-                }}
+              <textarea
+                {...methods.register('notes')}
+                rows={4}
+                className="w-full border-gray-300 rounded-md shadow-sm
+                           focus:ring-blue-500 focus:border-blue-500"
+                placeholder="(Optional) Any special requirements or details?"
               />
-              {errors.user_id && (
-                <p className="mt-1 text-sm text-red-600">{errors.user_id.message}</p>
-              )}
             </div>
-          )}
 
-          <DentistSelect
-            register={register}
-            error={errors.dentist_id?.message}
-          />
-
-          <AppointmentTypeSelect
-            register={register}
-            error={errors.appointment_type_id?.message}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <DatePicker
-              register={register}
-              watch={watch}
-              error={errors.appointment_date?.message}
-            />
-            <TimeSlotPicker
-              register={register}
-              watch={watch}
-              error={errors.appointment_time?.message}
-              editingAppointmentId={editingAppointment?.id} // so we can ignore ourselves if needed
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Additional Notes
-            </label>
-            <textarea
-              {...register('notes')}
-              rows={4}
-              className="w-full border-gray-300 rounded-md shadow-sm 
-                         focus:ring-blue-500 focus:border-blue-500"
-              placeholder="(Optional) Any special requirements or details?"
-            />
-          </div>
-
-          {/* Modal Footer */}
-          <div className="flex justify-end space-x-4">
-            {isEditing && (
-              <Button variant="danger" type="button" onClick={handleDelete}>
-                Delete
+            {/* Footer actions */}
+            <div className="flex justify-end space-x-4">
+              {isEditing && (
+                <Button variant="danger" type="button" onClick={handleDelete}>
+                  Delete
+                </Button>
+              )}
+              <Button variant="secondary" type="button" onClick={onClose}>
+                Cancel
               </Button>
-            )}
-            <Button variant="secondary" type="button" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-              disabled={isSubmitting || !isValid}
-            >
-              {isEditing ? 'Save Changes' : 'Book Appointment'}
-            </Button>
-          </div>
-        </form>
+              <Button
+                type="submit"
+                isLoading={isSubmitting}
+                disabled={isSubmitting || !isValid}
+              >
+                {isEditing ? 'Save Changes' : 'Book Appointment'}
+              </Button>
+            </div>
+          </form>
+        </FormProvider>
       </div>
     </div>
   );
