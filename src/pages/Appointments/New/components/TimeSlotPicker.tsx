@@ -6,6 +6,7 @@ import {
   getSchedules,
   getDayAppointments,
 } from '../../../../lib/api';
+import { format } from 'date-fns'; // We'll use `format` to display 12h times
 
 interface TimeSlotPickerProps {
   editingAppointmentId?: number;
@@ -49,7 +50,7 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
       const res = await getSchedules();
       return res.data;
     },
-    // Only call once or keep enabled (the schedule rarely changes)
+    // Only call once or keep enabled
   });
 
   // 2) Query the day’s appointments for that dentist/date
@@ -63,41 +64,41 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
     enabled: Boolean(dentistId && appointmentDate),
   });
 
-  // 3) Compute the list of free slots
+  // 3) Compute the list of free slots in "HH:mm" format
   const availableSlots = useMemo(() => {
-    // If missing info, no slots
     if (!dentistId || !appointmentDate || !appointmentTypeId || !scheduleData) return [];
 
-    // Check if day is even open
+    // Check if day is open or closed
     const dayObj = new Date(appointmentDate);
     if (isNaN(dayObj.getTime())) return [];
 
     // Day-of-week
-    const wday = dayObj.getDay(); // 0=Sun,1=Mon,2=Tue,...
+    const wday = dayObj.getDay();
     if (!scheduleData.openDays.includes(wday)) {
       // Clinic closed on that weekday
       return [];
     }
 
-    // Check if globally closed (like "2025-01-25" in closedDays)
-    const dateStr = appointmentDate; 
+    // Check if globally closed
+    const dateStr = appointmentDate;
     const isClosedDay = scheduleData.closedDays.some(cd => cd.date === dateStr);
     if (isClosedDay) {
       return [];
     }
 
-    // The clinic’s daily open/close times from schedule
+    // Suppose we fetch actual duration from the selected appointment type
+    // but we'll just guess a default 60 min for demonstration:
+    const assumedDuration = 60; // minutes
+
+    // Parse clinic's open/close times, e.g. "09:00" => [9, 0]
     const [openH,  openM]  = scheduleData.clinicOpenTime.split(':').map(Number);
     const [closeH, closeM] = scheduleData.clinicCloseTime.split(':').map(Number);
 
-    // Suppose we fetch actual duration from the selected appointment type
-    // but for example:
-    const assumedDuration = 60; // minutes
-
-    // Build candidate slots from clinicOpenTime..clinicCloseTime
+    // Build candidate slots
     const slots: string[] = [];
     let hour = openH;
     let min  = openM;
+
     while (
       hour < closeH ||
       (hour === closeH && min + assumedDuration <= closeM)
@@ -118,14 +119,14 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
       (u) => u.dentistId === Number(dentistId) && u.date === dateStr
     );
 
-    // Then also exclude overlap with dayAppointments
+    // Then exclude overlap with dayAppointments
     const freeSlots = slots.filter(slotStr => {
       const [slotH, slotM] = slotStr.split(':').map(Number);
       const slotStart = new Date(dayObj);
       slotStart.setHours(slotH, slotM, 0, 0);
       const slotEnd = new Date(slotStart.getTime() + assumedDuration * 60_000);
 
-      //  (a) Check overlap with dentistBlocks
+      // (a) Check overlap with dentistBlocks
       const hasBlockOverlap = dentistBlocks.some(block => {
         const [bStartH, bStartM] = block.startTime.split(':').map(Number);
         const [bEndH,   bEndM]   = block.endTime.split(':').map(Number);
@@ -135,12 +136,11 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
         const blockEnd   = new Date(dayObj);
         blockEnd.setHours(bEndH, bEndM, 0, 0);
 
-        // Overlaps if slotStart < blockEnd AND slotEnd > blockStart
         return slotStart < blockEnd && slotEnd > blockStart;
       });
       if (hasBlockOverlap) return false;
 
-      //  (b) Check overlap with scheduled appointments
+      // (b) Check overlap with scheduled appointments
       const hasApptOverlap = dayAppointments.some(appt => {
         const apptStart = new Date(appt.appointmentTime);
         const apptDur   = appt.duration ?? 30;
@@ -162,7 +162,15 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
     dayAppointments,
   ]);
 
-  // 4) On user selection => set "appointment_time"
+  // Helper to convert "HH:mm" => "h:mm a" for display
+  function displaySlot(slotStr: string) {
+    const [h, m] = slotStr.split(':').map(Number);
+    // We'll build a Date object for the same day (just to format):
+    const dummy = new Date();
+    dummy.setHours(h, m, 0, 0);
+    return format(dummy, 'h:mm aa'); // e.g. "9:00 AM"
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setValue('appointment_time', e.target.value, {
       shouldTouch: true,
@@ -184,7 +192,7 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
         <option value="">Select a time slot</option>
         {availableSlots.map(slot => (
           <option key={slot} value={slot}>
-            {slot}
+            {displaySlot(slot)} {/* 12-hour format display */}
           </option>
         ))}
       </select>

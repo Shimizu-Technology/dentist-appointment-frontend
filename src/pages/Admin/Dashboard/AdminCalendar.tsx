@@ -58,8 +58,8 @@ export default function AdminCalendar() {
   const { data: scheduleData } = useQuery<SchedulesResponse>({
     queryKey: ['schedule-data'],
     queryFn: async () => {
-      const res = await getSchedules(); // GET /schedule
-      return res.data;                 // { clinicOpenTime, clinicCloseTime, openDays, ... }
+      const res = await getSchedules();
+      return res.data;
     },
   });
 
@@ -100,12 +100,12 @@ export default function AdminCalendar() {
     const dur = appt.appointmentType?.duration ?? 60;
     const end = new Date(start.getTime() + dur * 60_000);
 
-    // NEW, more tailored color palette for status:
-    let backgroundColor = '#7dd3fc'; // "Scheduled" => a nice Tailwind blue-300
+    // Color them by status
+    let backgroundColor = '#86efac'; // default green
     if (appt.status === 'cancelled') {
-      backgroundColor = '#f87171'; // Red-400
+      backgroundColor = '#fca5a5'; // Red
     } else if (appt.status === 'completed') {
-      backgroundColor = '#4ade80'; // Green-400
+      backgroundColor = '#93c5fd'; // Blue
     }
 
     return {
@@ -128,8 +128,7 @@ export default function AdminCalendar() {
     end: cd.date,
     allDay: true,
     display: 'background',
-    // A lighter gray for closed blocks
-    backgroundColor: '#e2e8f0', // Tailwind gray-200
+    backgroundColor: '#d1d5db', // gray-300
     title: cd.reason || 'Closed Day',
     overlap: false, // so it won't overlap with appt events
   }));
@@ -154,7 +153,7 @@ export default function AdminCalendar() {
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
     if (clickInfo.event.display === 'background') {
-      // That means user clicked a closed-day block => ignore or show a message
+      // That means user clicked a closed day block => ignore
       return;
     }
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
@@ -193,7 +192,7 @@ export default function AdminCalendar() {
           appointment_time: event.start.toISOString(),
         });
         queryClient.invalidateQueries(['admin-appointments-for-calendar', selectedDentistId]);
-        toast.success(`Appointment #${appt.id} updated!`);
+        toast.success('Appointment rescheduled successfully!');
       } catch (err: any) {
         toast.error('Could not reschedule appointment.');
         dropInfo.revert();
@@ -207,9 +206,6 @@ export default function AdminCalendar() {
     resizeInfo.revert();
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────
-  //    RENDER
-  // ─────────────────────────────────────────────────────────────────
   if (apptError) {
     return (
       <div className="text-red-600 p-4">
@@ -218,12 +214,12 @@ export default function AdminCalendar() {
     );
   }
 
-  // Convenience: If the schedule hasn't loaded yet, default to Monday..Friday 09:00..17:00
+  // Provide fallback if scheduleData is not loaded yet
   const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5]; // Mon-Fri
   const openTime = scheduleData?.clinicOpenTime ?? '09:00';
   const closeTime = scheduleData?.clinicCloseTime ?? '17:00';
 
-  // Little color dot for the legend
+  // A small color dot for the legend
   function ColorDot({ color }: { color: string }) {
     return <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: color }} />;
   }
@@ -250,19 +246,19 @@ export default function AdminCalendar() {
       {/* LEGEND */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
-          <ColorDot color="#7dd3fc" />
+          <ColorDot color="#86efac" />
           <span>Scheduled</span>
         </div>
         <div className="flex items-center gap-1">
-          <ColorDot color="#f87171" />
+          <ColorDot color="#fca5a5" />
           <span>Cancelled</span>
         </div>
         <div className="flex items-center gap-1">
-          <ColorDot color="#4ade80" />
+          <ColorDot color="#93c5fd" />
           <span>Completed</span>
         </div>
         <div className="flex items-center gap-1">
-          <ColorDot color="#e2e8f0" />
+          <ColorDot color="#d1d5db" />
           <span>Closed Day</span>
         </div>
       </div>
@@ -278,8 +274,10 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
+        // Show half-hour or quarter-hour slots if you like:
         slotDuration="00:15:00"
         snapDuration="00:30:00"
+        // Start at 8 AM, end at 9 PM
         slotMinTime="08:00:00"
         slotMaxTime="21:00:00"
         headerToolbar={{
@@ -287,12 +285,25 @@ export default function AdminCalendar() {
           center: 'title',
           right: 'timeGridWeek,dayGridMonth',
         }}
+        // businessHours from your schedule
         businessHours={{
           daysOfWeek: openDays,
           startTime: openTime,
           endTime: closeTime,
         }}
         displayEventTime
+        // Use 12-hour format for events
+        eventTimeFormat={{
+          hour: 'numeric',
+          minute: '2-digit',
+          meridiem: 'short', // e.g. "AM"/"PM"
+        }}
+        // Also label the time slots in 12-hour format
+        slotLabelFormat={{
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }}
         events={allEvents}
         height="auto"
       />
