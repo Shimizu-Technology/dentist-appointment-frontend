@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../../lib/api';
 import NewAppointmentForm from '../New/NewAppointmentForm';
 import { ArrowLeft } from 'lucide-react';
+import { format } from 'date-fns';
 import type { Appointment } from '../../../types';
 
 interface AppointmentsApiResponse {
@@ -20,12 +21,12 @@ export default function AppointmentEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Query all appointments (the user sees only theirs, admin sees all).
+  // 1) Fetch all appointments (the API returns only the current user’s if not admin).
   const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
     queryKey: ['appointments'],
     queryFn: async () => {
       const response = await getAppointments();
-      return response.data;
+      return response.data; // { appointments: [...], meta: {...} }
     },
   });
 
@@ -55,7 +56,10 @@ export default function AppointmentEdit() {
     );
   }
 
+  // Extract the array of appointments
   const appointments = data?.appointments || [];
+
+  // Find the appointment by ID
   const appointment = appointments.find((a) => a.id === Number(id));
 
   if (!appointment) {
@@ -66,7 +70,7 @@ export default function AppointmentEdit() {
             Appointment Not Found
           </h2>
           <p className="text-gray-600 mb-4">
-            The appointment you're looking for doesn't exist.
+            The appointment you’re looking for doesn’t exist or isn’t yours.
           </p>
           <button
             onClick={() => navigate('/appointments')}
@@ -79,9 +83,20 @@ export default function AppointmentEdit() {
     );
   }
 
+  // 2) Render a “Reschedule” header with the existing date/time
+  let scheduledInfo = '';
+  try {
+    const dt = new Date(appointment.appointmentTime);
+    if (!isNaN(dt.getTime())) {
+      scheduledInfo = `Currently scheduled: ${format(dt, 'MMMM d, yyyy h:mm a')}`;
+    }
+  } catch {
+    /* ignore parse errors */
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link
@@ -91,20 +106,23 @@ export default function AppointmentEdit() {
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Appointment
           </Link>
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Reschedule Appointment
-          </h1>
-          <p className="text-xl text-blue-100">
-            Update your appointment details
-          </p>
+          <h1 className="text-4xl font-bold text-white mb-2">Reschedule Appointment</h1>
+          <p className="text-xl text-blue-100">Update your appointment details</p>
+
+          {/* Show the “currently scheduled” date/time if we have it */}
+          {scheduledInfo && (
+            <p className="mt-2 text-sm text-blue-100">
+              {scheduledInfo}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body: reuse the same form as “new” but pass the existing appointment */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <NewAppointmentForm
-          appointment={appointment}
-          onSuccess={() => navigate(`/appointments/${id}`)}
+          appointment={appointment}       // Pass the existing appointment
+          onSuccess={() => navigate(`/appointments/${id}`)} 
         />
       </div>
     </div>
