@@ -1,14 +1,19 @@
-// src/pages/Appointments/[id]/AppointmentDetails.tsx
+// File: /src/pages/Appointments/[id]/AppointmentDetails.tsx
+
 import { format } from 'date-fns';
 import { Calendar, Clock, User, FileText } from 'lucide-react';
 import type { Appointment } from '../../../types';
+import AppointmentActions from '../../../components/Appointments/AppointmentActions';
+import { useNavigate } from 'react-router-dom';
+import { canManageAppointment } from '../../../utils/appointments';
 
 interface AppointmentDetailsProps {
   appointment: Appointment;
 }
 
 export default function AppointmentDetails({ appointment }: AppointmentDetailsProps) {
-  // For the main user or a dependent?
+  const navigate = useNavigate();
+  // Is this for a dependent or the main user
   const isForDependent = !!appointment.dependent;
   const displayName = isForDependent
     ? `${appointment.dependent?.firstName} ${appointment.dependent?.lastName}`
@@ -26,15 +31,32 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
     /* no-op */
   }
 
+  const handleEdit = () => {
+    navigate(`/appointments/${appointment.id}/edit`);
+  };
+
+  const statusColors: Record<string, string> = {
+    scheduled: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-8">
-      {/* Show status label up top, e.g. “Scheduled”, “Cancelled”, etc. */}
+      {/* Status label + possibly the “Reschedule/Cancel” buttons below */}
       <div className="flex items-center justify-between mb-6">
-        <span className="px-3 py-1 rounded-full text-sm font-medium
-                         bg-blue-100 text-blue-800">
+        <span
+          className={[
+            'px-3 py-1 rounded-full text-sm font-medium',
+            statusColors[appointment.status] ?? '',
+          ].join(' ')}
+        >
           {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
         </span>
-        {/* Possibly your “Reschedule” or “Cancel” buttons go here */}
+        {/* Show actions if allowed */}
+        {canManageAppointment(appointment) && (
+          <AppointmentActions appointment={appointment} onEdit={handleEdit} />
+        )}
       </div>
 
       {/* Who is it for? */}
@@ -92,11 +114,15 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
           <p className="text-gray-600 mt-1">
             {appointment.appointmentType?.name || 'N/A'}
           </p>
-          <p className="text-gray-500 text-sm">
-            Duration: {appointment.appointmentType?.duration} minutes
-          </p>
+          {appointment.appointmentType?.duration && (
+            <p className="text-gray-500 text-sm">
+              Duration: {appointment.appointmentType.duration} minutes
+            </p>
+          )}
         </div>
       </div>
+
+      {/* More fields like "notes" could go here */}
     </div>
   );
 }

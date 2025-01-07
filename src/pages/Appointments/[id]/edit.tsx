@@ -1,3 +1,4 @@
+// File: /src/pages/Appointments/[id]/edit.tsx
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../../lib/api';
@@ -101,7 +102,6 @@ export default function AppointmentEdit() {
 
       {/* Body */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Just use the existing appointment as default for NewAppointmentForm */}
         <NewAppointmentForm
           appointment={appointment}
           onSuccess={() => navigate(`/appointments/${id}`)}

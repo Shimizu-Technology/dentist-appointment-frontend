@@ -1,3 +1,4 @@
+// File: /src/components/Appointments/AppointmentActions.tsx
 import { Edit2, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { cancelAppointment } from '../../lib/api';
@@ -7,7 +8,7 @@ import type { Appointment } from '../../types';
 
 interface AppointmentActionsProps {
   appointment: Appointment;
-  onEdit: () => void;
+  onEdit: () => void; // parent is responsible for navigation
 }
 
 export default function AppointmentActions({ appointment, onEdit }: AppointmentActionsProps) {
@@ -16,9 +17,11 @@ export default function AppointmentActions({ appointment, onEdit }: AppointmentA
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      // Possibly show a toast
     },
   });
 
+  // If the user truly can’t manage, return null. Usually we just rely on parent check.
   if (!canManageAppointment(appointment)) {
     return null;
   }
