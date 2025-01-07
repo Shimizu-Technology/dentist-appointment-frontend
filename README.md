@@ -1,6 +1,6 @@
 # ISA Dental Frontend
 
-This project is a **React + TypeScript + Vite** front-end for the **ISA Dental** appointment scheduling system. It provides a user-friendly interface for patients (and their dependents) to manage appointments, update insurance info, and communicate with the ISA Dental backend.
+This project is a **React + TypeScript + Vite** front-end for the **ISA Dental** appointment scheduling system. It provides a user-friendly interface for patients (and their dependents) to manage appointments, update insurance info, and communicate with the ISA Dental backend. In addition, it integrates with AWS S3 if you’re displaying dentist images that have been uploaded from the backend.
 
 ---
 
@@ -13,7 +13,8 @@ This project is a **React + TypeScript + Vite** front-end for the **ISA Dental**
 5. [Environment Variables](#environment-variables)  
 6. [Deployment](#deployment)  
 7. [Key Features](#key-features)  
-8. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
+8. [AWS S3 Integration (Images)](#aws-s3-integration-images)
+9. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
 
 ---
 
@@ -53,9 +54,9 @@ dentist-appointment-frontend
 ├─ public/               # Static assets (favicon, etc.)
 ├─ src/                  # Application source code
 │  ├─ components/        # Reusable React components
-│  ├─ pages/             # Page-level components (e.g. /login, /appointments)
-│  ├─ hooks/             # Custom React hooks (e.g. useAuth, useInsurance)
-│  ├─ lib/               # API calls, and utility functions
+│  ├─ pages/             # Page-level components (e.g., /login, /appointments)
+│  ├─ hooks/             # Custom React hooks (e.g., useAuth, useInsurance)
+│  ├─ lib/               # API calls, utility functions, S3 url builder, etc.
 │  ├─ store/             # Zustand store for auth state
 │  ├─ types/             # TypeScript type definitions
 │  ├─ App.tsx            # Main application routes
@@ -93,6 +94,7 @@ dentist-appointment-frontend
        - Includes a FullCalendar-based UI for scheduling
      - **Appointment Types** (CRUD)
      - **Users** (see all users, optionally promote them to admin)
+     - **Dentists** (create, edit, delete, and **upload dentist photos**)
 
 ---
 
@@ -155,7 +157,7 @@ Ensure that the environment variable used in production is set to the correct ba
    - Manage appointments on behalf of your dependents.
 
 3. **Insurance**  
-   - Users can view/update their insurance info (provider, policy number, plan type).
+   - Users can view/update their insurance info (provider name, policy number, plan type).
 
 4. **Admin Dashboard**  
    - Available only to users with `role === 'admin'`.  
@@ -164,11 +166,41 @@ Ensure that the environment variable used in production is set to the correct ba
      - **Appointment Types**: Create/edit/delete appointment types (duration, name, description).  
      - **Users**: View all user accounts and optionally promote them to admin.  
      - **Calendar**: A more comprehensive calendar view for the entire schedule, including closed days.  
-     - **Schedules**: Manage clinic open/close times, global closed days, and individual dentist unavailabilities.
+     - **Schedules**: Manage clinic open/close times, global closed days, and individual dentist unavailabilities.  
+     - **Dentists**: Create/update/delete dentists. **Upload Dentist Photo** functionality is included (which references the AWS S3 URL stored in the backend).
 
 5. **Role-based Access**  
    - Regular users can only manage their own profile/appointments.  
-   - Admin sees and manages all appointments, appointment types, users, schedules, and more.
+   - Admin sees and manages all appointments, appointment types, users, schedules, and more, including dentist profile images.
+
+---
+
+## AWS S3 Integration (Images)
+
+When the backend is configured for **AWS S3** (and a dentist photo upload feature is used):
+
+- Each **dentist** may have an `image_url` pointing to a publicly accessible S3 bucket key.  
+- This front end simply renders `<img src={dentist.imageUrl} />`.  
+- If you see an **“AccessDenied”** error, ensure your S3 bucket policy or ACL settings allow for `s3:GetObject` from the public.
+
+Example Bucket Policy excerpt:
+```jsonc
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowPublicRead",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::YOUR_BUCKET_NAME/*"
+    }
+  ]
+}
+```
+Additionally:
+- If your bucket enforces “Bucket Owner Enforced” ownership, the `public-read` ACL parameter might be ignored. Instead, rely on the bucket policy for public read access.
+- Ensure “Block Public Access” is configured to allow `public` GET requests for objects (if you truly want them publicly viewable).
 
 ---
 
