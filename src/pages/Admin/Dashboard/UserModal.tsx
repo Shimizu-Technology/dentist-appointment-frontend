@@ -1,235 +1,214 @@
 // File: /src/pages/Admin/Dashboard/UserModal.tsx
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { createUser, updateUser, deleteUser } from '../../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
 import Input from '../../../components/UI/Input';
-import {
-  createUser,
-  updateUser,
-  deleteUser,
-} from '../../../lib/api';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-
 import type { User } from '../../../types';
 
 interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User | null; // null => create mode, otherwise edit mode
+  existingUser: User | null;  // if null => creating a new user
 }
 
-interface FormData {
-  firstName: string;
-  lastName: string;
-  email?: string;
-  phone?: string;
-  password?: string;
-  role: 'user' | 'admin' | 'phone_only';
-}
-
-export default function UserModal({ isOpen, onClose, user }: UserModalProps) {
+/**
+ * Admin can create or update a user. 
+ * Password is *not* set by the admin. Instead, the user will get an invitation link.
+ * 
+ * - phone is required for all roles
+ * - email is optional if phone_only
+ * - if role != phone_only, email *should* be provided (they’ll get an invite)
+ */
+export default function UserModal({ isOpen, onClose, existingUser }: UserModalProps) {
   const queryClient = useQueryClient();
-  const isEditMode = !!user;
 
-  const {
-    register,
-    reset,
-    handleSubmit,
-    formState: { errors, isSubmitting, isValid },
-  } = useForm<FormData>({
-    mode: 'onChange',
-  });
+  // Form fields
+  const [firstName, setFirstName] = useState('');
+  const [lastName,  setLastName]  = useState('');
+  const [phone,     setPhone]     = useState('');
+  const [email,     setEmail]     = useState('');
+  const [role,      setRole]      = useState<'user' | 'admin' | 'phone_only'>('user');
 
-  // When the modal opens, fill the form if editing
+  // On open, fill from existing user if editing
   useEffect(() => {
     if (!isOpen) return;
 
-    if (isEditMode && user) {
-      reset({
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        // Don’t show password
-        role: user.role, // could be 'user', 'admin', or 'phone_only'
-      });
+    if (existingUser) {
+      // Editing
+      setFirstName(existingUser.firstName);
+      setLastName(existingUser.lastName);
+      setPhone(existingUser.phone || '');
+      setEmail(existingUser.email || '');
+      setRole(existingUser.role);
     } else {
-      // Creating new => blank
-      reset({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'user', // default
-      });
+      // Creating new => blank out
+      setFirstName('');
+      setLastName('');
+      setPhone('');
+      setEmail('');
+      setRole('user');
     }
-  }, [isOpen, isEditMode, user, reset]);
+  }, [isOpen, existingUser]);
 
-  // CREATE or UPDATE
-  const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      if (isEditMode && user) {
-        // Update
-        return updateUser(user.id, {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-          password: data.password, // if changing password
-          role: data.role,
+  // For dynamic form: 
+  // phone is always required  
+  // if role === 'phone_only', email is optional
+  // if role !== 'phone_only', we do strongly encourage an email
+
+  async function handleSave() {
+    if (!firstName.trim()) {
+      toast.error('First name is required.');
+      return;
+    }
+    if (!lastName.trim()) {
+      toast.error('Last name is required.');
+      return;
+    }
+    if (!phone.trim()) {
+      toast.error('Phone number is required.');
+      return;
+    }
+
+    // If user is NOT phone_only but no email given, we can either allow or fail.
+    // Typically we want them to have an email so they can be invited to set password.
+    if (role !== 'phone_only' && !email.trim()) {
+      toast.error('Email is required unless user is phone_only.');
+      return;
+    }
+
+    try {
+      if (existingUser) {
+        // Update existing
+        await updateUser(existingUser.id, {
+          firstName,
+          lastName,
+          phone,
+          email: email.trim() || undefined,
+          role,
         });
+        toast.success('User updated!');
       } else {
         // Create new
-        return createUser({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-          password: data.password,
-          role: data.role,
+        await createUser({
+          firstName,
+          lastName,
+          phone,
+          email: email.trim() || undefined,
+          // NO password => back end sends invite link 
+          role,
         });
+        toast.success('User created! (Invitation email sent if email was provided.)');
       }
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries(['users']);
-      toast.success(isEditMode ? 'User updated!' : 'User created!');
       onClose();
-    },
-    onError: (err: any) => {
+    } catch (err: any) {
       toast.error(`Failed to save user: ${err.message}`);
-    },
-  });
-
-  const onSubmit = (formData: FormData) => {
-    // If “phone_only,” we can skip requiring email/password, etc.
-    // But that’s optional logic — you could enforce validations in `react-hook-form`.
-    mutation.mutate(formData);
-  };
-
-  // DELETE (only if editing)
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteUser(user!.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['users']);
-      toast.success('User deleted.');
-      onClose();
-    },
-    onError: (err: any) => {
-      toast.error(`Failed to delete user: ${err.message}`);
-    },
-  });
-
-  const handleDelete = () => {
-    if (!user) return;
-    const yes = window.confirm(`Are you sure you want to delete ${user.email}?`);
-    if (yes) {
-      deleteMutation.mutate();
     }
-  };
+  }
+
+  async function handleDelete() {
+    if (!existingUser) return;
+    const yes = window.confirm('Are you sure you want to delete this user?');
+    if (!yes) return;
+
+    try {
+      await deleteUser(existingUser.id);
+      toast.success('User deleted!');
+      queryClient.invalidateQueries(['users']);
+      onClose();
+    } catch (err: any) {
+      toast.error(`Failed to delete user: ${err.message}`);
+    }
+  }
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-        {/* Header */}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white w-full max-w-lg rounded-md shadow-md">
+        {/* HEADER */}
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {isEditMode ? 'Edit User' : 'Create New User'}
+          <h2 className="text-xl font-semibold">
+            {existingUser ? 'Edit User' : 'Create New User'}
           </h2>
           <button onClick={onClose}>
             <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
           </button>
         </div>
 
-        {/* Body */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-4">
+        {/* BODY */}
+        <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="First Name"
-              {...register('firstName', { required: 'Required' })}
-              error={errors.firstName?.message}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
             />
             <Input
               label="Last Name"
-              {...register('lastName', { required: 'Required' })}
-              error={errors.lastName?.message}
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
             />
           </div>
 
           <Input
-            label="Email (for regular user/admin)"
-            type="email"
-            {...register('email')}
-            error={errors.email?.message}
+            label="Phone (required)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
           />
 
-          <Input
-            label="Phone (optional for normal user, required if phone_only)"
-            type="text"
-            {...register('phone')}
-            error={errors.phone?.message}
-          />
-
-          {/* Password only if creating a brand-new user or if admin wants to set a new one */}
-          {!isEditMode && (
+          {/** If role != phone_only, we want to encourage an email. */}
+          {role !== 'phone_only' && (
             <Input
-              label="Password (only if not phone_only)"
-              type="password"
-              {...register('password')}
-              error={errors.password?.message}
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="(required for normal or admin users)"
             />
           )}
 
+          {/** If role == phone_only, we hide the email field. 
+               But we also want an option to see the difference in the UI. */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Role
             </label>
             <select
-              className="border-gray-300 rounded-md w-full px-3 py-2
-                         focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              {...register('role', { required: 'Role is required' })}
+              className="border w-full rounded-md px-3 py-2"
+              value={role}
+              onChange={(e) =>
+                setRole(e.target.value as 'user' | 'admin' | 'phone_only')
+              }
             >
               <option value="user">Regular User</option>
               <option value="admin">Admin</option>
               <option value="phone_only">Phone-Only</option>
             </select>
-            {errors.role && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.role.message as string}
-              </p>
-            )}
           </div>
+        </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            {/* If editing, show Delete button */}
-            {isEditMode && (
-              <Button
-                variant="danger"
-                type="button"
-                onClick={handleDelete}
-                isLoading={deleteMutation.isLoading}
-              >
-                Delete
-              </Button>
-            )}
-            <Button variant="secondary" type="button" onClick={onClose}>
-              Cancel
+        {/* FOOTER ACTIONS */}
+        <div className="flex justify-end items-center space-x-4 p-4 border-t">
+          {existingUser && (
+            <Button variant="danger" onClick={handleDelete}>
+              Delete
             </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={!isValid || isSubmitting}
-              isLoading={mutation.isLoading || isSubmitting}
-            >
-              {isEditMode ? 'Save' : 'Create'}
-            </Button>
-          </div>
-        </form>
+          )}
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSave}>
+            {existingUser ? 'Save Changes' : 'Create User'}
+          </Button>
+        </div>
       </div>
     </div>
   );
