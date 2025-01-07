@@ -26,6 +26,7 @@ interface Appointment {
   dentistId: number;
   appointmentTypeId: number;
   notes?: string;
+  checkedIn?: boolean;
   user?: {
     id: number;
     email: string;
@@ -46,9 +47,10 @@ interface FormData {
   user_id?: string;
   dentist_id: string;
   appointment_type_id: string;
-  appointment_date: string; 
+  appointment_date: string;
   appointment_time: string;
   notes?: string;
+  checked_in?: boolean;
 }
 
 export default function AdminAppointmentModal({
@@ -66,6 +68,7 @@ export default function AdminAppointmentModal({
   const {
     handleSubmit,
     reset,
+    register,
     formState: { isSubmitting, isValid },
   } = methods;
 
@@ -84,6 +87,7 @@ export default function AdminAppointmentModal({
         appointment_date: dateStr,
         appointment_time: timeStr,
         notes: editingAppointment.notes || '',
+        checked_in: !!editingAppointment.checkedIn,
       });
       setSelectedUserId(null);
     } else {
@@ -97,6 +101,8 @@ export default function AdminAppointmentModal({
         appointment_date: baseDateStr,
         appointment_time: '',
         notes: '',
+        // For newly created appts, we default to false if you prefer:
+        checked_in: false,
       });
       setSelectedUserId(null);
     }
@@ -111,6 +117,8 @@ export default function AdminAppointmentModal({
         dentist_id: parseInt(data.dentist_id, 10),
         appointment_type_id: parseInt(data.appointment_type_id, 10),
         notes: data.notes,
+        // <--- We'll attach checked_in if we want:
+        checked_in: !!data.checked_in,
       };
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
@@ -224,11 +232,26 @@ export default function AdminAppointmentModal({
                 Additional Notes
               </label>
               <textarea
-                {...methods.register('notes')}
+                {...register('notes')}
                 rows={4}
                 className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+
+            {/* Only show check-in toggle if editing (but you can remove the condition if you want it on create) */}
+            {isEditing && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="checked_in_cb"
+                  {...register('checked_in')}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <label htmlFor="checked_in_cb" className="text-sm text-gray-700">
+                  Patient Checked In?
+                </label>
+              </div>
+            )}
 
             <div className="flex justify-end space-x-4">
               {isEditing && (

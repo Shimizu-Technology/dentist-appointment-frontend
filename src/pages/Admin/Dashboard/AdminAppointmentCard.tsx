@@ -2,13 +2,26 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar, Clock, User, Edit2, X, CheckCircle } from 'lucide-react';
+import {
+  Calendar,
+  Clock,
+  User,
+  Edit2,
+  X,
+  CheckCircle,
+  Check,
+} from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { cancelAppointment, updateAppointment } from '../../../lib/api';
+import {
+  cancelAppointment,
+  updateAppointment,
+  // or a dedicated checkInAppointment function, see note below
+  // checkInAppointment,
+} from '../../../lib/api';
 import Button from '../../../components/UI/Button';
-import AdminAppointmentModal from './AdminAppointmentModal';
-import type { Appointment } from '../../../types';
+import { Appointment } from '../../../types';
 import toast from 'react-hot-toast';
+import AdminAppointmentModal from './AdminAppointmentModal';
 
 interface AdminAppointmentCardProps {
   appointment: Appointment;
@@ -18,162 +31,155 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
   const queryClient = useQueryClient();
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Cancel mutation
-  const { mutate: handleCancel, isPending: isCancelling } = useMutation({
+  // Cancel
+  const { mutate: handleCancel } = useMutation({
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-appointments']);
-      queryClient.invalidateQueries(['admin-appointments-for-calendar']);
-      toast.success('Appointment cancelled successfully!');
+      toast.success('Appointment cancelled.');
     },
-    onError: (error: any) => {
-      toast.error(`Failed to cancel appointment: ${error.message}`);
+    onError: (err: any) => {
+      toast.error(`Failed to cancel: ${err.message}`);
     },
   });
 
-  // NEW: “Complete” mutation
-  const { mutate: handleComplete, isPending: isCompleting } = useMutation({
-    mutationFn: async () => {
-      // We call the normal update endpoint with { status: 'completed' }.
-      return updateAppointment(appointment.id, { status: 'completed' });
-    },
+  // Complete
+  const { mutate: handleComplete } = useMutation({
+    mutationFn: () =>
+      updateAppointment(appointment.id, { status: 'completed' }),
     onSuccess: () => {
-      // Re-fetch to see updated status.
       queryClient.invalidateQueries(['admin-appointments']);
-      queryClient.invalidateQueries(['admin-appointments-for-calendar']);
       toast.success('Appointment marked as completed!');
     },
-    onError: (error: any) => {
-      toast.error(`Failed to complete appointment: ${error.message}`);
+    onError: (err: any) => {
+      toast.error(`Failed to complete: ${err.message}`);
     },
   });
 
+  // Toggle Check-In
+  const { mutate: handleCheckInToggle, isLoading: isToggling } = useMutation({
+    // If you prefer calling the separate route:
+    // mutationFn: () => checkInAppointment(appointment.id),
+    // Or just do an update with { checked_in: !appointment.checkedIn }
+    mutationFn: () => updateAppointment(appointment.id, { checked_in: !appointment.checkedIn }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-appointments']);
+      toast.success('Check-in status updated!');
+    },
+    onError: (err: any) => {
+      toast.error(`Failed to check in/out: ${err.message}`);
+    },
+  });
+
+  // Confirm dialogs
   const onCancelClick = () => {
-    const yes = window.confirm('Are you sure you want to cancel this appointment?');
-    if (!yes) return;
+    if (!window.confirm('Cancel this appointment?')) return;
     handleCancel();
   };
 
   const onCompleteClick = () => {
-    const yes = window.confirm('Mark this appointment as completed?');
-    if (!yes) return;
+    if (!window.confirm('Mark as completed?')) return;
     handleComplete();
   };
 
-  let parsedDate: Date | null = null;
-  try {
-    parsedDate = new Date(appointment.appointmentTime);
-    if (isNaN(parsedDate.getTime())) {
-      parsedDate = null;
-    }
-  } catch {
-    parsedDate = null;
-  }
-
-  const statusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
+  const onCheckInClick = () => {
+    const msg = appointment.checkedIn
+      ? 'Uncheck-in the patient (Mark them as not arrived)?'
+      : 'Check-in the patient (Mark them as arrived)?';
+    if (!window.confirm(msg)) return;
+    handleCheckInToggle();
   };
 
+  // Parse date
+  let startTime = '';
+  try {
+    const dt = new Date(appointment.appointmentTime);
+    startTime = format(dt, 'MMMM d, yyyy • h:mm a');
+  } catch {}
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      {/* Header row: type + status badge */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">
-            {appointment.appointmentType?.name || 'Appointment'}
-          </h3>
-          {/* Show user’s name + email if the user object is present */}
-          <p className="text-sm text-gray-500">
-            {appointment.user
-              ? `Patient: ${appointment.user.firstName} ${appointment.user.lastName} (${appointment.user.email})`
-              : appointment.userName
-                ? `Patient: ${appointment.userName} (${appointment.userEmail ?? 'No email'})`
-                : `Patient ID: ${appointment.userId}`
-            }
-          </p>
+    <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+      {/* Header row */}
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-lg font-semibold text-gray-900">
+          {appointment.appointmentType?.name || 'Appointment'}
+        </h3>
+        <div className="flex items-center space-x-2">
+          {/* Show "Arrived" if checkedIn is true */}
+          {appointment.checkedIn && (
+            <span className="bg-green-100 text-green-800 px-2 py-1 text-xs rounded-full">
+              Arrived
+            </span>
+          )}
+          {/* status badge */}
+          <span className="bg-blue-100 text-blue-800 px-2 py-1 text-xs rounded-full">
+            {appointment.status.charAt(0).toUpperCase() +
+              appointment.status.slice(1)}
+          </span>
         </div>
-
-        <span
-          className={[
-            'px-3 py-1 rounded-full text-sm font-medium',
-            statusColors[appointment.status] || '',
-          ].join(' ')}
-        >
-          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-        </span>
       </div>
 
-      {/* Body: date/time + dentist */}
-      <div className="space-y-3 mb-6">
-        {parsedDate ? (
-          <>
-            <div className="flex items-center text-gray-600">
-              <Calendar className="w-5 h-5 mr-2" />
-              {format(parsedDate, 'MMMM d, yyyy')}
-            </div>
-            <div className="flex items-center text-gray-600">
-              <Clock className="w-5 h-5 mr-2" />
-              {format(parsedDate, 'h:mm a')}
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-red-500">Invalid date/time</p>
+      <div className="text-sm text-gray-600 mb-4">
+        {appointment.user && (
+          <p className="mb-1">
+            Patient: {appointment.user.firstName} {appointment.user.lastName} (
+            {appointment.user.email})
+          </p>
         )}
-
         {appointment.dentist && (
-          <div className="flex items-center text-gray-600">
-            <User className="w-5 h-5 mr-2" />
-            Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}
-          </div>
+          <p className="mb-1">
+            Dentist: Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}
+          </p>
         )}
+        <p>{startTime}</p>
       </div>
 
-      {/* Actions row */}
-      <div className="flex space-x-4">
-        {/* If still scheduled, allow Reschedule, Cancel, or Complete */}
+      <div className="flex items-center space-x-3">
+        {/* Check In toggle */}
         {appointment.status === 'scheduled' && (
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setShowEditModal(true)}
-              className="flex items-center"
-            >
-              <Edit2 className="w-4 h-4 mr-2" />
-              Reschedule
-            </Button>
+          <Button variant="outline" onClick={onCheckInClick} isLoading={isToggling}>
+            <Check className="w-4 h-4 mr-1" />
+            {appointment.checkedIn ? 'Un-Check In' : 'Check In'}
+          </Button>
+        )}
 
-            <Button
-              variant="secondary"
-              onClick={onCancelClick}
-              isLoading={isCancelling}
-              className="flex items-center text-red-600 hover:text-red-700"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
+        {/* Reschedule if scheduled */}
+        {appointment.status === 'scheduled' && (
+          <Button variant="outline" onClick={() => setShowEditModal(true)}>
+            <Edit2 className="w-4 h-4 mr-1" />
+            Reschedule
+          </Button>
+        )}
 
-            {/* NEW: Mark as Completed */}
-            <Button
-              variant="outline"
-              onClick={onCompleteClick}
-              isLoading={isCompleting}
-              className="flex items-center text-green-700 hover:text-green-800"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Complete
-            </Button>
-          </>
+        {/* Cancel if scheduled */}
+        {appointment.status === 'scheduled' && (
+          <Button
+            variant="secondary"
+            onClick={onCancelClick}
+            className="text-red-600 hover:text-red-700"
+          >
+            <X className="w-4 h-4 mr-1" />
+            Cancel
+          </Button>
+        )}
+
+        {/* Complete if scheduled */}
+        {appointment.status === 'scheduled' && (
+          <Button variant="outline" onClick={onCompleteClick}>
+            <CheckCircle className="w-4 h-4 mr-1" />
+            Complete
+          </Button>
         )}
       </div>
 
-      {/* Edit modal for rescheduling */}
-      <AdminAppointmentModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        editingAppointment={appointment}
-      />
+      {/* Reschedule modal if you use one */}
+      {showEditModal && (
+        <AdminAppointmentModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          editingAppointment={appointment}
+        />
+      )}
     </div>
   );
 }
