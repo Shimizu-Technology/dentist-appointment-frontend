@@ -1,12 +1,16 @@
-// src/pages/Admin/Dashboard/AppointmentsList.tsx
+// File: src/pages/Admin/Dashboard/AppointmentsList.tsx
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getAppointments } from '../../../lib/api';
-import AdminAppointmentCard from './AdminAppointmentCard';
-import type { Appointment } from '../../../types';
-import Button from '../../../components/UI/Button';
 import { Plus } from 'lucide-react';
+
 import AdminAppointmentModal from './AdminAppointmentModal';
+import AdminAppointmentCard from './AdminAppointmentCard';
+
+import Button from '../../../components/UI/Button';
+import type { Appointment } from '../../../types';
+import { api } from '../../../lib/api'; 
+  // or wherever you import your axios instance from
+  // If you use "getAppointments" from /lib/api, you can adapt that function to accept the query params
 
 interface PaginatedAppointments {
   appointments: Appointment[];
@@ -18,41 +22,69 @@ interface PaginatedAppointments {
   };
 }
 
+// Example helper to fetch the appointments from your updated Rails endpoint
+async function fetchAppointments({
+  page,
+  status,
+  searchTerm,
+  dentistName,
+  date,
+}: {
+  page: number;
+  status: string;       // "scheduled", "completed", "cancelled", "past", or ""
+  searchTerm: string;
+  dentistName: string;
+  date: string;
+}) {
+  const response = await api.get('/appointments', {
+    params: {
+      page,
+      per_page: 10,
+      status,
+      q: searchTerm,
+      dentist_name: dentistName,
+      date,
+    },
+  });
+  return response.data as PaginatedAppointments;
+}
+
 export default function AppointmentsList() {
-  // Pagination state
-  const [page, setPage] = useState(1);
+  // Pagination
+  const [page, setPage] = useState<number>(1);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDentist, setFilterDentist] = useState('');
-  const [filterDate, setFilterDate] = useState('');
+  const [dentistName, setDentistName] = useState('');
+  const [date, setDate] = useState('');
 
-  // Track if “New Appointment” modal is open
+  // IMPORTANT: default to "scheduled"
+  const [status, setStatus] = useState('scheduled');
+
+  // Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Smoothly scroll to top whenever `page` changes.
+  // Scroll to top when changing pages
   useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
-  // Fetch paginated appointments with React Query
+  // Now, use React Query to fetch from the server, 
+  // passing the current page & filters as part of the query key
   const {
     data,
     isLoading,
+    isError,
     error,
     isFetching,
   } = useQuery<PaginatedAppointments>({
-    queryKey: ['admin-appointments', page],
-    queryFn: async () => {
-      const response = await getAppointments(page, 10); // fetch page=page, per_page=10
-      return response.data; // shape: { appointments: [...], meta: {...} }
-    },
-    keepPreviousData: true, // avoid flicker when changing pages
+    queryKey: ['admin-appointments', page, status, searchTerm, dentistName, date],
+    queryFn: () =>
+      fetchAppointments({ page, status, searchTerm, dentistName, date }),
+    keepPreviousData: true, // Keep old data while fetching new
   });
 
+  // If loading...
   if (isLoading) {
     return (
       <div className="text-center py-12">
@@ -61,107 +93,105 @@ export default function AppointmentsList() {
     );
   }
 
-  if (error) {
+  // If error...
+  if (isError) {
     return (
       <div className="text-center py-12 text-red-600">
-        Failed to load appointments. Please try again later.
+        Failed to load appointments: {String(error)}
       </div>
     );
   }
 
   if (!data) {
-    return null; // or handle gracefully
+    return null; 
   }
 
   const { appointments, meta } = data;
 
-  // In-memory filter on the CURRENT page's appointments:
-  const filteredAppointments = appointments.filter((appt) => {
-    const search = searchTerm.toLowerCase().trim();
-    const userName = (appt.userName || '').toLowerCase();
-    const userIdStr = String(appt.userId);
-    const userEmail = (appt.userEmail || '').toLowerCase();
-
-    // Match if searchTerm is found in name, ID, or email
-    const matchesNameIdEmail =
-      userName.includes(search) ||
-      userIdStr === search ||
-      userEmail.includes(search);
-
-    // Dentist name
-    const dentistName = appt.dentist
-      ? `${appt.dentist.firstName} ${appt.dentist.lastName}`.toLowerCase()
-      : '';
-    const matchesDentist = filterDentist
-      ? dentistName.includes(filterDentist.toLowerCase())
-      : true;
-
-    // Filter by date
-    const apptDate = appt.appointmentTime?.split('T')[0] || '';
-    const matchesDate = filterDate ? apptDate === filterDate : true;
-
-    return matchesNameIdEmail && matchesDentist && matchesDate;
-  });
-
-  // Sort from earliest date to latest date
-  filteredAppointments.sort((a, b) => {
-    const dateA = new Date(a.appointmentTime).getTime();
-    const dateB = new Date(b.appointmentTime).getTime();
-    return dateA - dateB; // ascending
-  });
-
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-md shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Combined search input */}
+      {/* Filter box */}
+      <div className="bg-white p-6 rounded-md shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Search input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search by Name, ID, or Email
+              Search (Name, Email, ID)
             </label>
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              placeholder='e.g. "Jane Doe", "15", or "user@example.com"'
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm 
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder='e.g. "Jane", "user@example.com", "15"'
             />
           </div>
 
-          {/* Filter by Dentist */}
+          {/* Dentist name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Filter by Dentist
+              Dentist
             </label>
             <input
               type="text"
-              value={filterDentist}
-              onChange={(e) => setFilterDentist(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              value={dentistName}
+              onChange={(e) => {
+                setDentistName(e.target.value);
+                setPage(1);
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm 
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder='e.g. "Mary Smith"'
             />
           </div>
 
-          {/* Filter by Date */}
+          {/* Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Filter by Date (YYYY-MM-DD)
+              Date (YYYY-MM-DD)
             </label>
             <input
               type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+                setPage(1);
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {/* Default to scheduled */}
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="past">Past</option>
+              <option value="">All</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* "New Appointment" button for Admin */}
+      {/* Create Appointment Button */}
       <div className="text-right">
         <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center">
           <Plus className="w-5 h-5 mr-2" />
@@ -169,15 +199,13 @@ export default function AppointmentsList() {
         </Button>
       </div>
 
-      {/* Filtered results */}
-      {filteredAppointments.length > 0 ? (
-        filteredAppointments.map((appt) => (
+      {/* Results */}
+      {appointments.length > 0 ? (
+        appointments.map((appt) => (
           <AdminAppointmentCard key={appt.id} appointment={appt} />
         ))
       ) : (
-        <p className="text-center text-gray-500 mt-6">
-          No matching appointments found.
-        </p>
+        <p className="text-center text-gray-500 mt-6">No matching appointments found.</p>
       )}
 
       {/* Pagination */}
@@ -208,10 +236,12 @@ export default function AppointmentsList() {
       </div>
 
       {isFetching && (
-        <div className="text-center text-sm text-gray-500">Loading...</div>
+        <div className="text-center text-sm text-gray-500 mt-2">
+          Loading...
+        </div>
       )}
 
-      {/* The create appointment modal */}
+      {/* Create/Edit modal */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
