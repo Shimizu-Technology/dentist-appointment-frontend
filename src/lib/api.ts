@@ -55,7 +55,6 @@ export function buildFullImageUrl(imagePath?: string): string {
   return baseRoot + imagePath;
 }
 
-
 /** ----------------------------------------------------------------
  * DAY APPOINTMENTS
  * ----------------------------------------------------------------*/
@@ -71,7 +70,6 @@ export async function getDayAppointments(
   return api.get('/appointments/day_appointments', { params });
 }
 
-
 /** ----------------------------------------------------------------
  * AUTH / SESSIONS
  * ----------------------------------------------------------------*/
@@ -79,7 +77,7 @@ export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
 
-// Accepts phone as an optional fifth parameter
+// Accepts phone as an optional 5th parameter
 export async function signup(
   email: string,
   password: string,
@@ -100,7 +98,6 @@ export async function signup(
   });
 }
 
-
 /** ----------------------------------------------------------------
  * CURRENT USER
  * ----------------------------------------------------------------*/
@@ -114,7 +111,6 @@ export async function updateCurrentUser(data: {
     user: data,
   });
 }
-
 
 /** ----------------------------------------------------------------
  * DENTISTS
@@ -148,7 +144,6 @@ export async function updateDentist(dentistId: number, data: any) {
 export async function deleteDentist(dentistId: number) {
   return api.delete(`/dentists/${dentistId}`);
 }
-
 
 /** ----------------------------------------------------------------
  * APPOINTMENTS
@@ -189,7 +184,6 @@ export async function getNextAvailable(params: {
   return api.get('/appointments/next_available', { params });
 }
 
-
 /** ----------------------------------------------------------------
  * APPOINTMENT TYPES
  * ----------------------------------------------------------------*/
@@ -216,7 +210,6 @@ export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
 
-
 /** ----------------------------------------------------------------
  * DEPENDENTS
  * ----------------------------------------------------------------*/
@@ -239,7 +232,6 @@ export async function updateDependent(
   return api.patch(`/dependents/${dependentId}`, { dependent: data });
 }
 
-
 /** ----------------------------------------------------------------
  * INSURANCE (User updates)
  * ----------------------------------------------------------------*/
@@ -257,7 +249,6 @@ export async function updateInsurance(insuranceData: {
   });
 }
 
-
 /** ----------------------------------------------------------------
  * USERS (Admin-only)
  * ----------------------------------------------------------------*/
@@ -274,6 +265,52 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
   return api.get('/users/search', { params: { q: query, page, per_page: perPage } });
 }
 
+/** CREATE a user as Admin. (For phone-only or normal user or even admin.) */
+export async function createUser(payload: {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+  role: 'user' | 'admin' | 'phone_only';
+}) {
+  return api.post('/users', {
+    user: {
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      email: payload.email,
+      phone: payload.phone,
+      password: payload.password,
+      role: payload.role,
+    },
+  });
+}
+
+/** UPDATE an existing user (Admin). */
+export async function updateUser(userId: number, payload: {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+  role?: 'user' | 'admin' | 'phone_only';
+}) {
+  return api.patch(`/users/${userId}`, {
+    user: {
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      email: payload.email,
+      phone: payload.phone,
+      password: payload.password,
+      role: payload.role,
+    },
+  });
+}
+
+/** DELETE a user (Admin). */
+export async function deleteUser(userId: number) {
+  return api.delete(`/users/${userId}`);
+}
 
 /** ----------------------------------------------------------------
  * CLOSED DAYS
@@ -290,7 +327,6 @@ export async function deleteClosedDay(id: number) {
   return api.delete(`/closed_days/${id}`);
 }
 
-
 /** ----------------------------------------------------------------
  * SCHEDULES (Admin-only)
  * ----------------------------------------------------------------*/
@@ -305,7 +341,6 @@ export async function updateSchedules(data: {
 }) {
   return api.patch('/schedule', data);
 }
-
 
 /** ----------------------------------------------------------------
  * DENTIST UNAVAILABILITIES (Admin)
@@ -337,7 +372,6 @@ export async function updateDentistUnavailability(
 export async function deleteDentistUnavailability(id: number) {
   return api.delete(`/dentist_unavailabilities/${id}`);
 }
-
 
 /** ----------------------------------------------------------------
  * DENTIST IMAGE UPLOAD (Admin-only)
