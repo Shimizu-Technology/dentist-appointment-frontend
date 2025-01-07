@@ -1,4 +1,5 @@
 // File: src/pages/Admin/Dashboard/AppointmentsList.tsx
+
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -8,9 +9,7 @@ import AdminAppointmentCard from './AdminAppointmentCard';
 
 import Button from '../../../components/UI/Button';
 import type { Appointment } from '../../../types';
-import { api } from '../../../lib/api'; 
-  // or wherever you import your axios instance from
-  // If you use "getAppointments" from /lib/api, you can adapt that function to accept the query params
+import { api } from '../../../lib/api';
 
 interface PaginatedAppointments {
   appointments: Appointment[];
@@ -22,7 +21,7 @@ interface PaginatedAppointments {
   };
 }
 
-// Example helper to fetch the appointments from your updated Rails endpoint
+// Helper to fetch appointments w/ pagination & filters
 async function fetchAppointments({
   page,
   status,
@@ -31,7 +30,7 @@ async function fetchAppointments({
   date,
 }: {
   page: number;
-  status: string;       // "scheduled", "completed", "cancelled", "past", or ""
+  status: string;
   searchTerm: string;
   dentistName: string;
   date: string;
@@ -58,19 +57,17 @@ export default function AppointmentsList() {
   const [dentistName, setDentistName] = useState('');
   const [date, setDate] = useState('');
 
-  // IMPORTANT: default to "scheduled"
+  // Default to "scheduled"
   const [status, setStatus] = useState('scheduled');
 
-  // Modal state
+  // Create new appointment modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Scroll to top when changing pages
+  // Scroll to top on page change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
-  // Now, use React Query to fetch from the server, 
-  // passing the current page & filters as part of the query key
   const {
     data,
     isLoading,
@@ -81,10 +78,9 @@ export default function AppointmentsList() {
     queryKey: ['admin-appointments', page, status, searchTerm, dentistName, date],
     queryFn: () =>
       fetchAppointments({ page, status, searchTerm, dentistName, date }),
-    keepPreviousData: true, // Keep old data while fetching new
+    keepPreviousData: true,
   });
 
-  // If loading...
   if (isLoading) {
     return (
       <div className="text-center py-12">
@@ -93,7 +89,6 @@ export default function AppointmentsList() {
     );
   }
 
-  // If error...
   if (isError) {
     return (
       <div className="text-center py-12 text-red-600">
@@ -102,9 +97,7 @@ export default function AppointmentsList() {
     );
   }
 
-  if (!data) {
-    return null; 
-  }
+  if (!data) return null;
 
   const { appointments, meta } = data;
 
@@ -125,8 +118,7 @@ export default function AppointmentsList() {
                 setSearchTerm(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm 
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder='e.g. "Jane", "user@example.com", "15"'
             />
           </div>
@@ -143,8 +135,7 @@ export default function AppointmentsList() {
                 setDentistName(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm 
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder='e.g. "Mary Smith"'
             />
           </div>
@@ -161,8 +152,7 @@ export default function AppointmentsList() {
                 setDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -177,10 +167,8 @@ export default function AppointmentsList() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {/* Default to scheduled */}
               <option value="scheduled">Scheduled</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
@@ -191,9 +179,9 @@ export default function AppointmentsList() {
         </div>
       </div>
 
-      {/* Create Appointment Button */}
+      {/* "New Appointment" button */}
       <div className="text-right">
-        <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center">
+        <Button variant="primary" onClick={() => setIsCreateModalOpen(true)} className="flex items-center">
           <Plus className="w-5 h-5 mr-2" />
           New Appointment
         </Button>
@@ -205,7 +193,9 @@ export default function AppointmentsList() {
           <AdminAppointmentCard key={appt.id} appointment={appt} />
         ))
       ) : (
-        <p className="text-center text-gray-500 mt-6">No matching appointments found.</p>
+        <p className="text-center text-gray-500 mt-6">
+          No matching appointments found.
+        </p>
       )}
 
       {/* Pagination */}
@@ -217,11 +207,9 @@ export default function AppointmentsList() {
         >
           Previous
         </button>
-
         <span className="text-gray-600">
           Page {meta.currentPage} of {meta.totalPages}
         </span>
-
         <button
           onClick={() => {
             if (meta.currentPage < meta.totalPages) {
@@ -241,7 +229,7 @@ export default function AppointmentsList() {
         </div>
       )}
 
-      {/* Create/Edit modal */}
+      {/* Create-Appointment Modal */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

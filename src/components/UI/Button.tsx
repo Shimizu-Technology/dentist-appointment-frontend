@@ -1,6 +1,7 @@
+// File: /src/components/UI/Button.tsx
 import { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'warning' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -20,19 +21,27 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const baseStyles =
-    'inline-flex items-center justify-center rounded-md font-semibold transition-colors ' +
+    'inline-flex items-center justify-center rounded-md font-medium transition-colors ' +
     'focus:outline-none focus:ring-2 focus:ring-offset-2';
 
   const variants: Record<ButtonVariant, string> = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
-    outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50 focus:ring-blue-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+    primary:
+      'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
+    secondary:
+      'bg-gray-100 text-gray-800 hover:bg-gray-200 focus:ring-gray-300',
+    outline:
+      'border border-primary-600 text-primary-600 hover:bg-primary-50 focus:ring-primary-500',
+    danger:
+      'bg-red-500 text-white hover:bg-red-600 focus:ring-red-400',
+    warning:
+      'bg-yellow-400 text-white hover:bg-yellow-500 focus:ring-yellow-400',
+    success:
+      'bg-green-500 text-white hover:bg-green-600 focus:ring-green-400',
   };
 
   const sizes: Record<ButtonSize, string> = {
     sm: 'px-3 py-1 text-sm',
-    md: 'px-4 py-2 text-sm', // or text-base, depending on your design
+    md: 'px-4 py-2 text-sm',
     lg: 'px-5 py-3 text-base',
   };
 
@@ -40,8 +49,8 @@ export default function Button({
     baseStyles,
     variants[variant],
     sizes[size],
+    (disabled || isLoading) ? 'opacity-50 cursor-not-allowed' : '',
     className,
-    disabled || isLoading ? 'opacity-50 cursor-not-allowed' : '',
   ].join(' ');
 
   return (
