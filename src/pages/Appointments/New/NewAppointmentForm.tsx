@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createAppointment } from '../../../lib/api';
 import { getDependents } from '../../../lib/api';
 import { useQuery } from '@tanstack/react-query';
-import toast from 'react-hot-toast';   // <-- Import the toast function
+import toast from 'react-hot-toast';
 import Button from '../../../components/UI/Button';
 import { formatAppointmentDate } from '../../../utils/dates';
 
@@ -34,7 +34,7 @@ export default function NewAppointmentForm() {
     queryKey: ['dependents'],
     queryFn: async () => {
       const res = await getDependents();
-      return res.data; // array of Dependent objects
+      return res.data; 
     },
   });
 
@@ -70,7 +70,7 @@ export default function NewAppointmentForm() {
         dependentId = Number(formData.who);
       }
 
-      // Build payload for the backend
+      // Build payload
       const payload = {
         appointment_time: isoString,
         dentist_id: Number(formData.dentist_id),
@@ -79,24 +79,25 @@ export default function NewAppointmentForm() {
         ...(dependentId ? { dependent_id: dependentId } : {}),
       };
 
-      // Actually call our createAppointment API
       return createAppointment(payload);
     },
   });
 
-  // 4) onSubmit: handle the success/error flow
+  // 4) onSubmit
   const onSubmit = async (data: AppointmentFormData) => {
     try {
       const response = await mutateAsync(data);
-      // If we get here, the appointment was created successfully
-      toast.success('Appointment created successfully!');
-      // Optionally refresh the appointments list
+
+      toast.success('Appointment booked successfully!');
+      // The newly created appointment is in response.data, e.g. { id: ..., ... }
+      const newAppt = response.data;
+
+      // Instead of navigate('/appointments'), we go to:
+      navigate(`/appointments/new/confirmation/${newAppt.id}`);
+
+      // Optionally refresh appointment list:
       queryClient.invalidateQueries(['appointments']);
-      // Redirect the user
-      navigate('/appointments');
     } catch (error: any) {
-      // If server returns 422, we likely have validation errors
-      // e.g., error.response?.data?.errors => ["Dentist is unavailable", ...]
       const errors = error?.response?.data?.errors;
       if (Array.isArray(errors) && errors.length > 0) {
         toast.error(`Failed to create appointment: ${errors.join(', ')}`);
@@ -106,7 +107,6 @@ export default function NewAppointmentForm() {
     }
   };
 
-  // 5) Render
   if (depsLoading) {
     return <p className="text-gray-500">Loading dependents...</p>;
   }
@@ -115,7 +115,7 @@ export default function NewAppointmentForm() {
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-lg p-8">
         <div className="space-y-6">
-          {/* Who is the appointment for: “Myself” or “depId” */}
+          {/* Who is the appointment for? */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Who is this appointment for?
@@ -153,11 +153,6 @@ export default function NewAppointmentForm() {
             />
           </div>
 
-          {/* 
-            6) The “Book Appointment” button 
-            Show spinner if isSubmitting = true. 
-            Our custom Button component might have a prop called `isLoading`.
-          */}
           <Button
             type="submit"
             isLoading={isSubmitting}

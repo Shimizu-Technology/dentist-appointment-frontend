@@ -19,17 +19,18 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import AdminRoute from './components/Auth/AdminRoute';
 
+// NEW IMPORT
+import BookingConfirmation from './pages/Appointments/New/Confirmation'; // <--- We'll create this
+
 const queryClient = new QueryClient();
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        {/* Outer flex container: takes full screen height */}
         <div className="flex flex-col min-h-screen">
           <Navbar />
 
-          {/* Main content wrapper: grows to push footer down if content is short */}
           <div className="flex-grow bg-gray-50">
             <Routes>
               <Route path="/" element={<Home />} />
@@ -81,6 +82,15 @@ export default function App() {
               />
 
               <Route
+                path="/appointments/new/confirmation/:id"
+                element={
+                  <ProtectedRoute>
+                    <BookingConfirmation />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/admin/*"
                 element={
                   <AdminRoute>
@@ -91,7 +101,6 @@ export default function App() {
             </Routes>
           </div>
 
-          {/* Footer placed last, so it "sticks" at bottom on short pages */}
           <Footer />
         </div>
       </Router>
