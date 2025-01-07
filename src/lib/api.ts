@@ -156,15 +156,16 @@ export async function deleteDentist(dentistId: number) {
 export async function getAppointments(
   page?: number,
   perPage?: number,
-  dentistId?: number
+  dentistId?: number,
+  opts?: { onlyMine?: boolean }
 ) {
-  return api.get('/appointments', {
-    params: {
-      page,
-      per_page: perPage,
-      dentist_id: dentistId,
-    },
-  });
+  const params: any = { page, per_page: perPage, dentist_id: dentistId };
+
+  if (opts?.onlyMine) {
+    params.user_id = 'me';
+  }
+
+  return api.get('/appointments', { params });
 }
 
 export async function createAppointment(data: any) {

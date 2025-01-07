@@ -24,12 +24,13 @@ interface AppointmentFormData {
   appointment_date: string;
   appointment_time: string;
   notes?: string;
+  // If you wanted an explicit user_id for admins, you could add user_id here
 }
 
 /**
  * Props:
  * - `appointment`: if present, we’re editing an existing appointment
- * - `onSuccess`: callback after a successful creation/update
+ * - `onSuccess`: optional callback after a successful creation/update
  */
 interface NewAppointmentFormProps {
   appointment?: Appointment;
@@ -55,25 +56,21 @@ export default function NewAppointmentForm({
     },
   });
 
-  // 2) Build default values (if “appointment” is provided, fill them)
+  // 2) Build default values
   let defaultWho = 'self';
   if (appointment && appointment.dependentId) {
     defaultWho = String(appointment.dependentId);
   }
 
-  // Convert appointment’s date/time => separate date / time strings
+  // Convert appointment’s date/time => separate date / time
   let defaultDate = '';
   let defaultTime = '';
   if (appointment?.appointmentTime) {
     try {
       const dt = new Date(appointment.appointmentTime);
       if (!isNaN(dt.getTime())) {
-        // e.g., "2025-06-10"
-        defaultDate = dt.toISOString().split('T')[0];
-        // e.g., "09:30"
-        defaultTime = dt
-          .toTimeString()
-          .slice(0, 5); // "HH:MM"
+        defaultDate = dt.toISOString().split('T')[0]; // "YYYY-MM-DD"
+        defaultTime = dt.toTimeString().slice(0, 5);   // "HH:MM"
       }
     } catch {
       /* ignore parse errors */
@@ -97,25 +94,26 @@ export default function NewAppointmentForm({
     formState: { isSubmitting, isValid },
   } = methods;
 
-  // 3) Reuse a single mutation for create or update, depending on `appointment`.
+  // 3) Single mutation for create or update
   const { mutateAsync } = useMutation({
     mutationFn: async (data: AppointmentFormData) => {
-      // Convert date + time into an ISO string
+      // Convert date + time => ISO
       const isoString = formatAppointmentDate(data.appointment_date, data.appointment_time);
 
-      // If user selected a dependent from the dropdown (who != "self")
+      // If user selected a dependent from the dropdown
       let dependentId: number | undefined;
       if (data.who !== 'self') {
         dependentId = Number(data.who);
       }
 
-      // Build the payload
       const payload = {
         appointment_time: isoString,
         dentist_id: Number(data.dentist_id),
         appointment_type_id: Number(data.appointment_type_id),
         notes: data.notes || '',
         ...(dependentId ? { dependent_id: dependentId } : {}),
+        // If you want an explicit user_id for admin to pick themself, do:
+        // user_id: someValue
       };
 
       if (appointment) {
@@ -132,6 +130,12 @@ export default function NewAppointmentForm({
         appointment ? 'Appointment updated successfully!' : 'Appointment created successfully!'
       );
       onSuccess?.();
+
+      // If NEW => go to confirmation
+      if (!appointment) {
+        const newAppt = resp.data; // newly created appointment
+        navigate(`/appointments/new/confirmation?id=${newAppt.id}`);
+      }
     },
     onError: (error: any) => {
       const errors = error?.response?.data?.errors;
@@ -148,7 +152,6 @@ export default function NewAppointmentForm({
     await mutateAsync(data);
   };
 
-  // 5) Render
   if (depsLoading) {
     return <p className="text-gray-500">Loading dependents...</p>;
   }
@@ -161,7 +164,7 @@ export default function NewAppointmentForm({
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-lg p-8">
         <div className="space-y-6">
-          {/* Who is the appointment for: “Myself” or dependent ID */}
+          {/* Who is this appt for: “Myself” or dependent */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Who is this appointment for?

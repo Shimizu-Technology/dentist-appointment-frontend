@@ -1,7 +1,7 @@
 // File: /src/pages/Appointments/New/Confirmation.tsx
 
 import { CheckCircle } from 'lucide-react';
-import { useParams, Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../../lib/api';
 import { format } from 'date-fns';
@@ -13,15 +13,35 @@ interface AppointmentsApiResponse {
 }
 
 export default function BookingConfirmation() {
-  const { id } = useParams();
+  // 1) We read “id” from the query string
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const idParam = searchParams.get('id');
 
-  // We'll re-use the same “getAppointments” or the single “getAppointments” call,
-  // then find the appointment with `id`. Another approach is to create an endpoint
-  // to fetch by ID. For simplicity, we do the same approach as AppointmentShow.
+  // 2) If no ID => show an error or fallback
+  if (!idParam) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+          No appointment ID provided.
+        </h2>
+        <Link
+          to="/appointments"
+          className="text-blue-600 hover:text-blue-800 font-medium underline"
+        >
+          Back to My Appointments
+        </Link>
+      </div>
+    );
+  }
+
+  // 3) We fetch all “my” appointments or all if admin, etc. But simplest is to
+  //    reuse the “appointments” query, then find the one with ID = idParam.
   const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
-    queryKey: ['appointments'],
+    queryKey: ['appointments', 'mine'],
     queryFn: async () => {
-      const res = await getAppointments();
+      // same logic as “My Appointments” to ensure you can see your own
+      const res = await getAppointments(undefined, undefined, undefined, { onlyMine: true });
       return res.data;
     },
   });
@@ -43,7 +63,7 @@ export default function BookingConfirmation() {
   }
 
   const appointments = data?.appointments || [];
-  const appointment = appointments.find((appt) => appt.id === Number(id));
+  const appointment = appointments.find((appt) => appt.id === Number(idParam));
 
   if (!appointment) {
     return (
@@ -61,7 +81,7 @@ export default function BookingConfirmation() {
     );
   }
 
-  // Format date/time
+  // 4) Format date/time
   let dateStr = '';
   let timeStr = '';
   try {
@@ -79,7 +99,6 @@ export default function BookingConfirmation() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-16 px-4">
-      {/* Big checkmark or success icon */}
       <CheckCircle className="w-24 h-24 text-green-500 mb-6" />
 
       <h1 className="text-3xl font-bold text-gray-800 mb-4">Appointment Booked!</h1>
@@ -87,7 +106,6 @@ export default function BookingConfirmation() {
         Your appointment has been successfully scheduled.
       </p>
 
-      {/* Appointment details card */}
       <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-xl">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-gray-800">
@@ -107,7 +125,7 @@ export default function BookingConfirmation() {
           </p>
           <p>
             <span className="font-medium">For: </span>{' '}
-            {isForDependent ? displayName : displayName}
+            {displayName}
           </p>
           {appointment.dentist && (
             <p>
@@ -123,7 +141,6 @@ export default function BookingConfirmation() {
         </div>
       </div>
 
-      {/* Link to see all appointments */}
       <div className="mt-8">
         <Link
           to="/appointments"

@@ -19,8 +19,8 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import AdminRoute from './components/Auth/AdminRoute';
 
-// NEW IMPORT
-import BookingConfirmation from './pages/Appointments/New/Confirmation'; // <--- We'll create this
+// UPDATED: changed from “/appointments/new/confirmation/:id” to no param.
+import BookingConfirmation from './pages/Appointments/New/Confirmation';
 
 const queryClient = new QueryClient();
 
@@ -48,6 +48,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/appointments"
                 element={
@@ -82,7 +83,7 @@ export default function App() {
               />
 
               <Route
-                path="/appointments/new/confirmation/:id"
+                path="/appointments/new/confirmation"
                 element={
                   <ProtectedRoute>
                     <BookingConfirmation />

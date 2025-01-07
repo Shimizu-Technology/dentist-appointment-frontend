@@ -1,4 +1,5 @@
-// src/pages/Appointments/AppointmentsList.tsx
+// File: /src/pages/Appointments/AppointmentsList.tsx
+
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../lib/api';
 import AppointmentCard from './AppointmentCard';
@@ -27,13 +28,13 @@ interface AppointmentsApiResponse {
 }
 
 export default function AppointmentsList() {
-  // Use the matching type for the "data" your API returns:
+  // Always see "only mine" for this page.
   const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
-    queryKey: ['appointments'],
+    queryKey: ['appointments', 'mine'],
     queryFn: async () => {
-      const response = await getAppointments();
-      return response.data; 
-      // NOTE: response.data is { appointments, meta }, not just an array
+      // We pass onlyMine: true for both normal user & admin
+      const response = await getAppointments(undefined, undefined, undefined, { onlyMine: true });
+      return response.data; // shape: { appointments, meta }
     },
   });
 
@@ -53,9 +54,7 @@ export default function AppointmentsList() {
     );
   }
 
-  // Extract the array of appointments from the object
   const appointments = data?.appointments || [];
-
   if (!appointments.length) {
     return (
       <div className="text-center py-12 text-gray-600">
@@ -64,7 +63,7 @@ export default function AppointmentsList() {
     );
   }
 
-  // Separate upcoming vs. past appointments
+  // Separate upcoming vs. past
   const now = new Date();
   const upcoming = appointments.filter(
     (appt) => new Date(appt.appointmentTime).getTime() >= now.getTime()
@@ -73,18 +72,18 @@ export default function AppointmentsList() {
     (appt) => new Date(appt.appointmentTime).getTime() < now.getTime()
   );
 
-  // Sort upcoming in ascending order (earliest first)
+  // Sort upcoming ascending
   upcoming.sort(
     (a, b) => new Date(a.appointmentTime).getTime() - new Date(b.appointmentTime).getTime()
   );
-  // Sort past in descending order (most recent first)
+  // Sort past descending
   past.sort(
     (a, b) => new Date(b.appointmentTime).getTime() - new Date(a.appointmentTime).getTime()
   );
 
   return (
     <div className="space-y-8">
-      {/* Upcoming Section */}
+      {/* Upcoming */}
       <section>
         <h2 className="text-xl font-semibold mb-4 text-gray-800">Upcoming Appointments</h2>
         {upcoming.length === 0 ? (
@@ -98,7 +97,7 @@ export default function AppointmentsList() {
         )}
       </section>
 
-      {/* Past (Archive) Section */}
+      {/* Past */}
       <section>
         <h2 className="text-xl font-semibold mt-6 mb-4 text-gray-800">Past Appointments</h2>
         {past.length === 0 ? (
