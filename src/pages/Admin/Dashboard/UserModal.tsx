@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { createUser, updateUser, deleteUser } from '../../../lib/api';
+import { createUser, updateUser, deleteUser, promoteUser } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
 import Input from '../../../components/UI/Input';
@@ -13,17 +13,23 @@ interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
   existingUser: User | null;  // if null => creating a new user
+  afterSave?: () => void;     // callback after creation / update
 }
 
 /**
  * Admin can create or update a user. 
- * Password is *not* set by the admin. Instead, the user will get an invitation link.
+ * Password is *not* set by the admin. Instead, the user will get an invitation link from the backend if email is present.
  * 
  * - phone is required for all roles
  * - email is optional if phone_only
  * - if role != phone_only, email *should* be provided (they’ll get an invite)
  */
-export default function UserModal({ isOpen, onClose, existingUser }: UserModalProps) {
+export default function UserModal({
+  isOpen,
+  onClose,
+  existingUser,
+  afterSave
+}: UserModalProps) {
   const queryClient = useQueryClient();
 
   // Form fields
@@ -33,7 +39,6 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
   const [email,     setEmail]     = useState('');
   const [role,      setRole]      = useState<'user' | 'admin' | 'phone_only'>('user');
 
-  // On open, fill from existing user if editing
   useEffect(() => {
     if (!isOpen) return;
 
@@ -43,7 +48,8 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
       setLastName(existingUser.lastName);
       setPhone(existingUser.phone || '');
       setEmail(existingUser.email || '');
-      setRole(existingUser.role);
+      // If user.role is something else, cast it as needed:
+      setRole(existingUser.role as 'user' | 'admin' | 'phone_only');
     } else {
       // Creating new => blank out
       setFirstName('');
@@ -54,12 +60,13 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
     }
   }, [isOpen, existingUser]);
 
-  // For dynamic form: 
+  // For dynamic form:
   // phone is always required  
   // if role === 'phone_only', email is optional
   // if role !== 'phone_only', we do strongly encourage an email
 
   async function handleSave() {
+    // Validate form
     if (!firstName.trim()) {
       toast.error('First name is required.');
       return;
@@ -73,10 +80,9 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
       return;
     }
 
-    // If user is NOT phone_only but no email given, we can either allow or fail.
-    // Typically we want them to have an email so they can be invited to set password.
+    // If user is NOT phone_only but no email given => show error
     if (role !== 'phone_only' && !email.trim()) {
-      toast.error('Email is required unless user is phone_only.');
+      toast.error('Email is required for normal or admin user.');
       return;
     }
 
@@ -91,6 +97,7 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
           role,
         });
         toast.success('User updated!');
+
       } else {
         // Create new
         await createUser({
@@ -98,15 +105,19 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
           lastName,
           phone,
           email: email.trim() || undefined,
-          // NO password => back end sends invite link 
+          // NO password => back end sends invite link if email is present
           role,
         });
         toast.success('User created! (Invitation email sent if email was provided.)');
       }
+
       queryClient.invalidateQueries(['users']);
+      afterSave?.();
       onClose();
+
     } catch (err: any) {
-      toast.error(`Failed to save user: ${err.message}`);
+      const msg = err?.response?.data?.errors?.join(', ') || err.message;
+      toast.error(`Failed to save user: ${msg}`);
     }
   }
 
@@ -119,13 +130,35 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
       await deleteUser(existingUser.id);
       toast.success('User deleted!');
       queryClient.invalidateQueries(['users']);
+      afterSave?.();
       onClose();
     } catch (err: any) {
       toast.error(`Failed to delete user: ${err.message}`);
     }
   }
 
+  async function handlePromote() {
+    if (!existingUser) return;
+    if (existingUser.role === 'admin') {
+      toast.error('They are already admin.');
+      return;
+    }
+
+    try {
+      await promoteUser(existingUser.id);
+      toast.success('User promoted to admin!');
+      queryClient.invalidateQueries(['users']);
+      afterSave?.();
+      onClose();
+    } catch (err: any) {
+      toast.error(`Failed to promote: ${err.message}`);
+    }
+  }
+
   if (!isOpen) return null;
+
+  const isEditing = !!existingUser;
+  const isAlreadyAdmin = existingUser?.role === 'admin';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -133,14 +166,14 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
         {/* HEADER */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-semibold">
-            {existingUser ? 'Edit User' : 'Create New User'}
+            {isEditing ? 'Edit User' : 'Create New User'}
           </h2>
           <button onClick={onClose}>
             <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
           </button>
         </div>
 
-        {/* BODY */}
+        {/* BODY: FORM FIELDS */}
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -164,7 +197,7 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
             required
           />
 
-          {/** If role != phone_only, we want to encourage an email. */}
+          {/** If role != phone_only, we want an email. */}
           {role !== 'phone_only' && (
             <Input
               label="Email"
@@ -175,8 +208,7 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
             />
           )}
 
-          {/** If role == phone_only, we hide the email field. 
-               But we also want an option to see the difference in the UI. */}
+          {/** Role dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Role
@@ -195,18 +227,26 @@ export default function UserModal({ isOpen, onClose, existingUser }: UserModalPr
           </div>
         </div>
 
-        {/* FOOTER ACTIONS */}
+        {/* FOOTER: ACTION BUTTONS */}
         <div className="flex justify-end items-center space-x-4 p-4 border-t">
-          {existingUser && (
+          {/* If editing, show Promote or Delete */}
+          {isEditing && !isAlreadyAdmin && (
+            <Button variant="outline" onClick={handlePromote}>
+              Promote to Admin
+            </Button>
+          )}
+
+          {isEditing && (
             <Button variant="danger" onClick={handleDelete}>
               Delete
             </Button>
           )}
+
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSave}>
-            {existingUser ? 'Save Changes' : 'Create User'}
+            {isEditing ? 'Save Changes' : 'Create User'}
           </Button>
         </div>
       </div>

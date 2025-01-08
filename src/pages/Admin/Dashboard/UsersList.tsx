@@ -41,6 +41,7 @@ export default function UsersList() {
     isLoading,
     error,
     isFetching,
+    refetch,
   } = useQuery<UsersApiResponse>({
     queryKey: ['users', page, debouncedTerm],
     queryFn: async () => {
@@ -77,14 +78,13 @@ export default function UsersList() {
 
   const { users, meta } = data;
 
-  // Handlers
   function openCreateModal() {
-    setEditingUser(null);
+    setEditingUser(null);   // indicates we are creating new
     setIsModalOpen(true);
   }
 
   function openEditModal(user: User) {
-    setEditingUser(user);
+    setEditingUser(user);   // indicates we are editing
     setIsModalOpen(true);
   }
 
@@ -137,7 +137,7 @@ export default function UsersList() {
                 <p className="text-sm text-gray-500">Phone: {u.phone}</p>
               )}
             </div>
-            {/* On hover, you could show an arrow or an icon indicating “click to edit” */}
+            {/* Optionally you can show an arrow icon here or nothing. */}
           </div>
         ))}
       </div>
@@ -175,11 +175,12 @@ export default function UsersList() {
         </div>
       )}
 
-      {/* CREATE / EDIT USER MODAL */}
+      {/* CREATE/EDIT USER MODAL */}
       <UserModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         existingUser={editingUser}
+        afterSave={() => refetch()}  // refresh the user list
       />
     </div>
   );

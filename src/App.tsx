@@ -18,6 +18,7 @@ import NewAppointment from './pages/Appointments/New';
 import AdminDashboard from './pages/Admin/Dashboard';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import AdminRoute from './components/Auth/AdminRoute';
+import FinishInvitation from './pages/FinishInvitation';  // <-- IMPORT the new component
 
 // UPDATED: changed from “/appointments/new/confirmation/:id” to no param.
 import BookingConfirmation from './pages/Appointments/New/Confirmation';
@@ -40,6 +41,10 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
 
+              {/* Add the finish-invitation route */}
+              <Route path="/finish-invitation" element={<FinishInvitation />} />
+
+              {/* Protected routes */}
               <Route
                 path="/profile"
                 element={
@@ -48,7 +53,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-
               <Route
                 path="/appointments"
                 element={
@@ -81,7 +85,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-
               <Route
                 path="/appointments/new/confirmation"
                 element={
@@ -91,6 +94,7 @@ export default function App() {
                 }
               />
 
+              {/* Admin routes */}
               <Route
                 path="/admin/*"
                 element={

@@ -4,9 +4,7 @@ import axios from 'axios';
 import type { ClosedDay } from '../../types';
 
 /**
- * 1) Determine baseURL for API calls, based on environment:
- *    - VITE_LOCAL_API_BASE_URL => e.g. http://localhost:3000/api/v1
- *    - VITE_PROD_API_BASE_URL  => e.g. https://yourdomain.com/api/v1
+ * 1) Determine baseURL for API calls, based on environment.
  */
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
@@ -26,32 +24,14 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/**
- * (Optional) A helper function for building a “full” absolute URL for images.
- * If your DB stores something like "/uploads/dentists/dentist_1_123.jpg"
- * and you need "http://localhost:3000/uploads/dentists/...", you can use this.
- *
- * Explanation:
- * - We start with the `baseURL`, which might be "http://localhost:3000/api/v1"
- * - We remove the trailing "/api/v1" to get just "http://localhost:3000"
- * - We then append the relative path stored in the DB.
- */
+/** Helper function for building absolute image URLs, if needed. */
 export function buildFullImageUrl(imagePath?: string): string {
   if (!imagePath) return '';
-
-  // 1) Remove trailing slash if any
   const trimmedBase = baseURL.replace(/\/$/, '');
-
-  // 2) Remove "/api/v1" at the end if present
-  //    That yields "http://localhost:3000" in dev, or your production domain
   const baseRoot = trimmedBase.replace(/\/api\/v1$/, '');
-
-  // 3) If the stored path is already absolute (starts with http or //), just return it
   if (imagePath.startsWith('http') || imagePath.startsWith('//')) {
     return imagePath;
   }
-
-  // 4) Otherwise, it’s probably a relative path like "/uploads/..."
   return baseRoot + imagePath;
 }
 
@@ -77,7 +57,14 @@ export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
 
-// Accepts phone as an optional 5th parameter
+/** 
+ * Invitation finish:
+ * PATCH /invitations/finish with { token, password }.
+ */
+export async function finishInvitation(token: string, password: string) {
+  return api.patch('/invitations/finish', { token, password });
+}
+
 export async function signup(
   email: string,
   password: string,
@@ -107,25 +94,18 @@ export async function updateCurrentUser(data: {
   phone?: string;
   email?: string;
 }) {
-  return api.patch('/users/current', {
-    user: data,
-  });
+  return api.patch('/users/current', { user: data });
 }
 
 /** ----------------------------------------------------------------
  * DENTISTS
  * ----------------------------------------------------------------*/
 export async function getDentists() {
-  // GET /api/v1/dentists
   return api.get('/dentists');
 }
-
 export async function getDentistAvailability(dentistId: number) {
-  // GET /api/v1/dentists/:id/availabilities
   return api.get(`/dentists/${dentistId}/availabilities`);
 }
-
-// CREATE (Admin) => POST /api/v1/dentists
 export async function createDentist(data: {
   first_name: string;
   last_name: string;
@@ -134,13 +114,9 @@ export async function createDentist(data: {
 }) {
   return api.post('/dentists', { dentist: data });
 }
-
-// UPDATE (Admin) => PATCH /api/v1/dentists/:id
 export async function updateDentist(dentistId: number, data: any) {
   return api.patch(`/dentists/${dentistId}`, { dentist: data });
 }
-
-// DELETE (Admin) => DELETE /api/v1/dentists/:id
 export async function deleteDentist(dentistId: number) {
   return api.delete(`/dentists/${dentistId}`);
 }
@@ -155,11 +131,9 @@ export async function getAppointments(
   opts?: { onlyMine?: boolean }
 ) {
   const params: any = { page, per_page: perPage, dentist_id: dentistId };
-
   if (opts?.onlyMine) {
     params.user_id = 'me';
   }
-
   return api.get('/appointments', { params });
 }
 
@@ -175,7 +149,6 @@ export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
 }
 
-// NEXT AVAILABLE: e.g. GET /appointments/next_available?dentistId=...
 export async function getNextAvailable(params: {
   dentistId?: number;
   appointmentTypeId?: number;
@@ -190,7 +163,6 @@ export async function getNextAvailable(params: {
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
-
 export async function createAppointmentType(data: {
   name: string;
   duration: number;
@@ -198,14 +170,12 @@ export async function createAppointmentType(data: {
 }) {
   return api.post('/appointment_types', { appointment_type: data });
 }
-
 export async function updateAppointmentType(
   id: number,
   data: { name: string; duration: number; description: string }
 ) {
   return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
-
 export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
@@ -216,7 +186,6 @@ export async function deleteAppointmentType(id: number) {
 export async function getDependents() {
   return api.get('/dependents');
 }
-
 export async function createDependent(data: {
   firstName: string;
   lastName: string;
@@ -224,7 +193,6 @@ export async function createDependent(data: {
 }) {
   return api.post('/dependents', { dependent: data });
 }
-
 export async function updateDependent(
   dependentId: number,
   data: { firstName: string; lastName: string; dateOfBirth: string }
@@ -255,17 +223,12 @@ export async function updateInsurance(insuranceData: {
 export async function getUsers(page = 1, perPage = 10) {
   return api.get('/users', { params: { page, per_page: perPage } });
 }
-
 export async function promoteUser(userId: number) {
   return api.patch(`/users/${userId}/promote`);
 }
-
-// GET /users/search?q=...&page=...&per_page=...
 export async function searchUsers(query: string, page = 1, perPage = 10) {
   return api.get('/users/search', { params: { q: query, page, per_page: perPage } });
 }
-
-/** CREATE a user as Admin. (For phone-only or normal user or even admin.) */
 export async function createUser(payload: {
   firstName: string;
   lastName: string;
@@ -285,16 +248,17 @@ export async function createUser(payload: {
     },
   });
 }
-
-/** UPDATE an existing user (Admin). */
-export async function updateUser(userId: number, payload: {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  password?: string;
-  role?: 'user' | 'admin' | 'phone_only';
-}) {
+export async function updateUser(
+  userId: number,
+  payload: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    role?: 'user' | 'admin' | 'phone_only';
+  }
+) {
   return api.patch(`/users/${userId}`, {
     user: {
       first_name: payload.firstName,
@@ -306,8 +270,6 @@ export async function updateUser(userId: number, payload: {
     },
   });
 }
-
-/** DELETE a user (Admin). */
 export async function deleteUser(userId: number) {
   return api.delete(`/users/${userId}`);
 }
@@ -318,11 +280,9 @@ export async function deleteUser(userId: number) {
 export async function getClosedDays() {
   return api.get<ClosedDay[]>('/closed_days');
 }
-
 export async function createClosedDay(data: { date: string; reason?: string }) {
   return api.post('/closed_days', { closed_day: data });
 }
-
 export async function deleteClosedDay(id: number) {
   return api.delete(`/closed_days/${id}`);
 }
@@ -333,7 +293,6 @@ export async function deleteClosedDay(id: number) {
 export async function getSchedules() {
   return api.get('/schedule');
 }
-
 export async function updateSchedules(data: {
   clinic_open_time: string;
   clinic_close_time: string;
@@ -355,7 +314,6 @@ export async function createDentistUnavailability(data: {
     dentist_unavailability: data,
   });
 }
-
 export async function updateDentistUnavailability(
   id: number,
   data: {
@@ -368,7 +326,6 @@ export async function updateDentistUnavailability(
     dentist_unavailability: data,
   });
 }
-
 export async function deleteDentistUnavailability(id: number) {
   return api.delete(`/dentist_unavailabilities/${id}`);
 }
@@ -380,10 +337,7 @@ export async function uploadDentistImage(dentistId: number, file: File) {
   const formData = new FormData();
   formData.append('image', file);
 
-  // POST /dentists/:id/upload_image
   return api.post(`/dentists/${dentistId}/upload_image`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
 }
