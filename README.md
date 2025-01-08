@@ -1,6 +1,6 @@
 # ISA Dental Frontend
 
-This project is a **React + TypeScript + Vite** front-end for the **ISA Dental** appointment scheduling system. It provides a user-friendly interface for patients (and their dependents) to manage appointments, update insurance info, and communicate with the ISA Dental backend. In addition, it integrates with AWS S3 if you’re displaying dentist images that have been uploaded from the backend.
+This project is a **React + TypeScript + Vite** front-end for the **ISA Dental** appointment scheduling system. It provides a user-friendly interface for patients (and their dependents) to manage appointments, update insurance info, receive email invitations to finish setting up their accounts, and communicate with the ISA Dental backend. It also integrates with AWS S3 if you’re displaying dentist images that have been uploaded from the backend.
 
 ---
 
@@ -13,8 +13,10 @@ This project is a **React + TypeScript + Vite** front-end for the **ISA Dental**
 5. [Environment Variables](#environment-variables)  
 6. [Deployment](#deployment)  
 7. [Key Features](#key-features)  
-8. [AWS S3 Integration (Images)](#aws-s3-integration-images)
-9. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
+8. [Invitations and Finish-Invitation Flow](#invitations-and-finish-invitation-flow)
+9. [Updated Admin Dashboard](#updated-admin-dashboard)
+10. [AWS S3 Integration (Images)](#aws-s3-integration-images)
+11. [Future Enhancements / Next Steps](#future-enhancements--next-steps)
 
 ---
 
@@ -22,7 +24,7 @@ This project is a **React + TypeScript + Vite** front-end for the **ISA Dental**
 
 - **Node.js** (v16+ recommended)  
 - **npm** (or **yarn**)  
-- **Vite** build tool (automatically used when you run the scripts)  
+- **Vite** build tool (automatically used when you run the scripts)
 
 ---
 
@@ -54,9 +56,9 @@ dentist-appointment-frontend
 ├─ public/               # Static assets (favicon, etc.)
 ├─ src/                  # Application source code
 │  ├─ components/        # Reusable React components
-│  ├─ pages/             # Page-level components (e.g., /login, /appointments)
+│  ├─ pages/             # Page-level components (e.g., /login, /appointments, /admin)
 │  ├─ hooks/             # Custom React hooks (e.g., useAuth, useInsurance)
-│  ├─ lib/               # API calls, utility functions, S3 url builder, etc.
+│  ├─ lib/               # API calls, utilities, S3 url builder, etc.
 │  ├─ store/             # Zustand store for auth state
 │  ├─ types/             # TypeScript type definitions
 │  ├─ App.tsx            # Main application routes
@@ -89,12 +91,7 @@ dentist-appointment-frontend
    - View and book appointments (including picking a date + time slot).  
    - Manage dependents.  
    - Update insurance information.  
-   - **(If admin)** Access the Admin Dashboard to manage:
-     - **Appointments** (view/cancel/reschedule all)
-       - Includes a FullCalendar-based UI for scheduling
-     - **Appointment Types** (CRUD)
-     - **Users** (see all users, optionally promote them to admin)
-     - **Dentists** (create, edit, delete, and **upload dentist photos**)
+   - **(If admin)** Access the Admin Dashboard (see [Updated Admin Dashboard](#updated-admin-dashboard)).
 
 ---
 
@@ -150,7 +147,6 @@ Ensure that the environment variable used in production is set to the correct ba
 1. **Appointments**  
    - Users can book new appointments, view upcoming ones, and cancel/reschedule if they meet the requirements (e.g., 24+ hours in advance).  
    - Admins can view and manage all appointments in a **FullCalendar**-based admin calendar (timeGrid or dayGrid view).  
-   - The user booking process uses **react-day-picker** to choose the date, then a time slot picker to confirm the final appointment time.
 
 2. **Dependents**  
    - Users can add/edit dependents.  
@@ -159,19 +155,42 @@ Ensure that the environment variable used in production is set to the correct ba
 3. **Insurance**  
    - Users can view/update their insurance info (provider name, policy number, plan type).
 
-4. **Admin Dashboard**  
-   - Available only to users with `role === 'admin'`.  
-   - **Tabs** for:
-     - **Appointments**: Admin sees all appointments site-wide, with the FullCalendar integration for quick drag-and-drop rescheduling.  
-     - **Appointment Types**: Create/edit/delete appointment types (duration, name, description).  
-     - **Users**: View all user accounts and optionally promote them to admin.  
-     - **Calendar**: A more comprehensive calendar view for the entire schedule, including closed days.  
-     - **Schedules**: Manage clinic open/close times, global closed days, and individual dentist unavailabilities.  
-     - **Dentists**: Create/update/delete dentists. **Upload Dentist Photo** functionality is included (which references the AWS S3 URL stored in the backend).
-
-5. **Role-based Access**  
+4. **Role-based Access**  
    - Regular users can only manage their own profile/appointments.  
    - Admin sees and manages all appointments, appointment types, users, schedules, and more, including dentist profile images.
+
+5. **Invitation Flow**  
+   - Admin can invite new users by creating them with an email (no password).  
+   - The new user receives an email with a link to finish their invitation and create their password.  
+   - This flow integrates seamlessly into the login process once the user sets their password.
+
+---
+
+## Invitations and Finish-Invitation Flow
+
+We now support an **invitation-based** sign-up for admin-created users:
+
+1. **Admin** creates a user (with `email`, `firstName`, `lastName`) in the **Admin Dashboard**.  
+2. The newly created user receives an **email invitation** (powered by SendGrid or your chosen email service).  
+3. The user clicks the **invitation link** (`/finish-invitation?token=...`) and is taken to the **FinishInvitation** page.  
+4. The user enters their **new password**, which finalizes the setup.  
+5. The user is then automatically logged in and can see their profile or appointments.
+
+---
+
+## Updated Admin Dashboard
+
+Our Admin Dashboard has been **restyled** with a cleaner, more modern layout. It features:
+
+- A **tab-based** interface with distinct panels for:
+  - **Appointments** (displayed in a card-like layout, filterable by date/dentist/status).
+  - **Appointment Types** (CRUD).
+  - **Users** (searchable list, create new invitations, promote to admin).
+  - **Calendar** (FullCalendar for a dayGrid or timeGrid view).
+  - **Schedules** (manage clinic open/close times, closed days, dentist unavailabilities).
+  - **Dentists** (card-based layout with image upload functionality).  
+
+We have also optimized for **mobile view** by making the tabs and calendar more responsive, so the interface does not overflow horizontally. The appointment cards and user lists use a more “card-like” approach on mobile to reduce visual clutter.
 
 ---
 
@@ -198,6 +217,7 @@ Example Bucket Policy excerpt:
   ]
 }
 ```
+
 Additionally:
 - If your bucket enforces “Bucket Owner Enforced” ownership, the `public-read` ACL parameter might be ignored. Instead, rely on the bucket policy for public read access.
 - Ensure “Block Public Access” is configured to allow `public` GET requests for objects (if you truly want them publicly viewable).
@@ -211,5 +231,5 @@ Additionally:
 - **Accessibility**: Ensure best practices for screen readers and keyboard navigation.  
 - **i18n**: Internationalization support for multiple languages.  
 - **Theming**: Support multiple color schemes or branding.  
-- **Better Admin Tools**: Precompute free slots for faster scheduling, advanced next-available-time searches, etc.  
-- **Pagination**: Additional smooth or infinite scrolling pagination for large datasets (e.g., Admin user list).  
+- **Better Admin Tools**: More advanced search, precomputed free slots, expanded reporting on appointment usage, etc.  
+- **Improved Invitation Management**: Option for admins to resend or invalidate invitations.
