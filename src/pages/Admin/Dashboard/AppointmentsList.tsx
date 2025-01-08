@@ -1,16 +1,14 @@
-// File: src/pages/Admin/Dashboard/AppointmentsList.tsx
-
+// File: /src/pages/Admin/Dashboard/AppointmentsList.tsx
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-
-import AdminAppointmentModal from './AdminAppointmentModal';
-import AdminAppointmentCard from './AdminAppointmentCard';
-
+import { api } from '../../../lib/api'; // or your fetchAppointments fn
 import Button from '../../../components/UI/Button';
+import AdminAppointmentCard from './AdminAppointmentCard';
+import AdminAppointmentModal from './AdminAppointmentModal';
 import type { Appointment } from '../../../types';
-import { api } from '../../../lib/api';
 
+// If your backend returns a paginated shape
 interface PaginatedAppointments {
   appointments: Appointment[];
   meta: {
@@ -60,7 +58,7 @@ export default function AppointmentsList() {
   // Default to "scheduled"
   const [status, setStatus] = useState('scheduled');
 
-  // Create new appointment modal
+  // Create-Appointment modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Scroll to top on page change
@@ -68,6 +66,7 @@ export default function AppointmentsList() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
+  // Query for appointments (admin sees all, with optional filters)
   const {
     data,
     isLoading,
@@ -103,8 +102,8 @@ export default function AppointmentsList() {
 
   return (
     <div className="space-y-6">
-      {/* Filter box */}
-      <div className="bg-white p-6 rounded-md shadow-sm space-y-4">
+      {/* 1) FILTERS IN A CARD */}
+      <div className="bg-white p-6 rounded-md shadow-md space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search input */}
           <div>
@@ -118,7 +117,8 @@ export default function AppointmentsList() {
                 setSearchTerm(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
+                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder='e.g. "Jane", "user@example.com", "15"'
             />
           </div>
@@ -135,7 +135,8 @@ export default function AppointmentsList() {
                 setDentistName(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
+                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder='e.g. "Mary Smith"'
             />
           </div>
@@ -152,7 +153,8 @@ export default function AppointmentsList() {
                 setDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
+                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -167,7 +169,8 @@ export default function AppointmentsList() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
+                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="scheduled">Scheduled</option>
               <option value="completed">Completed</option>
@@ -179,27 +182,35 @@ export default function AppointmentsList() {
         </div>
       </div>
 
-      {/* "New Appointment" button */}
+      {/* 2) "NEW APPOINTMENT" BUTTON */}
       <div className="text-right">
-        <Button variant="primary" onClick={() => setIsCreateModalOpen(true)} className="flex items-center">
+        <Button
+          variant="primary"
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center"
+        >
           <Plus className="w-5 h-5 mr-2" />
           New Appointment
         </Button>
       </div>
 
-      {/* Results */}
-      {appointments.length > 0 ? (
-        appointments.map((appt) => (
-          <AdminAppointmentCard key={appt.id} appointment={appt} />
-        ))
-      ) : (
-        <p className="text-center text-gray-500 mt-6">
-          No matching appointments found.
-        </p>
-      )}
+      {/* 3) APPOINTMENT RESULTS (AS CARDS) */}
+      <div className="bg-white p-6 rounded-md shadow-md">
+        {appointments.length > 0 ? (
+          <div className="space-y-4">
+            {appointments.map((appt) => (
+              <AdminAppointmentCard key={appt.id} appointment={appt} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-gray-500">
+            No matching appointments found.
+          </p>
+        )}
+      </div>
 
-      {/* Pagination */}
-      <div className="flex justify-center items-center mt-8 space-x-4">
+      {/* 4) PAGINATION CONTROLS */}
+      <div className="flex justify-center items-center mt-6 space-x-4">
         <button
           onClick={() => setPage((old) => Math.max(old - 1, 1))}
           disabled={meta.currentPage === 1 || isFetching}
@@ -207,9 +218,11 @@ export default function AppointmentsList() {
         >
           Previous
         </button>
+
         <span className="text-gray-600">
           Page {meta.currentPage} of {meta.totalPages}
         </span>
+
         <button
           onClick={() => {
             if (meta.currentPage < meta.totalPages) {
@@ -229,11 +242,11 @@ export default function AppointmentsList() {
         </div>
       )}
 
-      {/* Create-Appointment Modal */}
+      {/* 5) CREATE / EDIT APPOINTMENT MODAL */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        editingAppointment={null}
+        editingAppointment={null}  // null => "create" mode
       />
     </div>
   );
