@@ -124,6 +124,8 @@ export async function deleteDentist(dentistId: number) {
 /** ----------------------------------------------------------------
  * APPOINTMENTS
  * ----------------------------------------------------------------*/
+
+/** Fetch a paginated list of appointments (yours or all if admin). */
 export async function getAppointments(
   page?: number,
   perPage?: number,
@@ -135,6 +137,11 @@ export async function getAppointments(
     params.user_id = 'me';
   }
   return api.get('/appointments', { params });
+}
+
+/** Fetch a single appointment by ID. */
+export async function getAppointment(appointmentId: number) {
+  return api.get(`/appointments/${appointmentId}`);
 }
 
 export async function createAppointment(data: any) {

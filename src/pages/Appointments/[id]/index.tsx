@@ -1,41 +1,38 @@
-// src/pages/Appointments/[id]/index.tsx
+// File: /src/pages/Appointments/[id]/index.tsx
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getAppointments } from '../../../lib/api';
+import { getAppointment } from '../../../lib/api';
 import AppointmentDetails from './AppointmentDetails';
 import AppointmentHeader from './AppointmentHeader';
-import Footer from '../../../components/Layout/Footer';
 import type { Appointment } from '../../../types';
-
-/** 
- * Same shape as above:
- * {
- *   appointments: [...],
- *   meta: {...}
- * }
- */
-interface AppointmentsApiResponse {
-  appointments: Appointment[];
-  meta: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    perPage: number;
-  };
-}
 
 export default function AppointmentShow() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Expect the object with { appointments, meta }
-  const { data, isLoading, error } = useQuery<AppointmentsApiResponse>({
-    queryKey: ['appointments'],
+  // Single appointment fetch => we pass the numeric ID
+  const appointmentId = Number(id);
+
+  const { data, isLoading, error } = useQuery<Appointment>({
+    queryKey: ['appointment', appointmentId],
     queryFn: async () => {
-      const response = await getAppointments();
+      const response = await getAppointment(appointmentId);
+      // The server returns appointment data directly or { appointment: {...} } depending on your code
       return response.data; 
     },
+    enabled: !isNaN(appointmentId),
   });
+
+  if (isNaN(appointmentId)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <h2 className="text-2xl font-semibold text-gray-900">
+          Invalid appointment ID
+        </h2>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -63,19 +60,16 @@ export default function AppointmentShow() {
     );
   }
 
-  // Extract the array from data
-  const appointments = data?.appointments || [];
-
-  // Find the specific appointment by ID
-  const appointment = appointments.find((a) => a.id === Number(id));
-
-  if (!appointment) {
+  // If our query returned no data, or a 404 => data would be “null” or undefined.
+  if (!data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Appointment Not Found</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            Appointment Not Found
+          </h2>
           <p className="text-gray-600 mb-4">
-            The appointment you're looking for doesn't exist.
+            The appointment you&apos;re looking for doesn&apos;t exist or you don&apos;t have access.
           </p>
           <button
             onClick={() => navigate('/appointments')}
@@ -87,6 +81,9 @@ export default function AppointmentShow() {
       </div>
     );
   }
+
+  // Otherwise, we have the appointment
+  const appointment: Appointment = data;
 
   return (
     <div className="min-h-screen bg-gray-50">

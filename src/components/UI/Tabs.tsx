@@ -1,4 +1,3 @@
-// File: /src/components/UI/Tabs.tsx
 import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react';
 
 interface TabsContextValue {
@@ -25,11 +24,14 @@ export function Tabs({ defaultValue, children }: TabsProps) {
 
 interface TabsListProps {
   children: ReactNode;
+  className?: string;
 }
 
-export function TabsList({ children }: TabsListProps) {
+export function TabsList({ children, className = '' }: TabsListProps) {
   return (
-    <div className="flex space-x-1 border-b border-gray-200 mb-6">
+    <div
+      className={`flex space-x-1 border-b border-gray-200 mb-6 flex-wrap ${className}`}
+    >
       {children}
     </div>
   );
@@ -53,10 +55,11 @@ export function TabsTrigger({ value, children }: TabsTriggerProps) {
     <button
       onClick={() => setValue(value)}
       className={`
-        px-4 py-2 text-sm font-medium whitespace-nowrap pb-4 border-b-2 focus:outline-none
+        px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2
+        focus:outline-none
         ${
           isActive
-            ? 'text-gray-700 border-blue-500'
+            ? 'text-gray-900 border-blue-500'
             : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
         }
       `}
@@ -79,7 +82,6 @@ export function TabsContent({ value, children }: TabsContentProps) {
 
   const { value: activeValue } = ctx;
 
-  // Only render children if this tab's value matches the active tab
   if (activeValue !== value) return null;
 
   return <div className="mt-4">{children}</div>;

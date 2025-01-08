@@ -483,7 +483,7 @@ export default function SchedulesList() {
             onClick={handleAddAvailability}
             isLoading={createAvailMut.isLoading}
           >
-            Add Availability
+            Add Unavailability
           </Button>
         </div>
 

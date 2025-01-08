@@ -313,7 +313,7 @@ export default function AdminCalendar() {
         headerToolbar={{
           left: 'prev,today,next',
           center: 'title',
-          right: 'timeGridWeek,dayGridMonth',
+          right: 'timeGridWeek,dayGridMonth, dayGridDay',
         }}
         businessHours={{
           daysOfWeek: openDays,
