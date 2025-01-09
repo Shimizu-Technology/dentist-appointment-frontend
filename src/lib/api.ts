@@ -65,6 +65,10 @@ export async function finishInvitation(token: string, password: string) {
   return api.patch('/invitations/finish', { token, password });
 }
 
+/**
+ * Self-signup => POST /signup
+ * This is for a normal user creating their own account with a password.
+ */
 export async function signup(
   email: string,
   password: string,
@@ -73,7 +77,7 @@ export async function signup(
   phone?: string,
   role?: string
 ) {
-  return api.post('/users', {
+  return api.post('/signup', {
     user: {
       email,
       password,
@@ -236,6 +240,11 @@ export async function promoteUser(userId: number) {
 export async function searchUsers(query: string, page = 1, perPage = 10) {
   return api.get('/users/search', { params: { q: query, page, per_page: perPage } });
 }
+
+/**
+ * For admin to create a new user (invitation-based or phone_only).
+ * POST /users
+ */
 export async function createUser(payload: {
   firstName: string;
   lastName: string;
@@ -255,6 +264,7 @@ export async function createUser(payload: {
     },
   });
 }
+
 export async function updateUser(
   userId: number,
   payload: {
