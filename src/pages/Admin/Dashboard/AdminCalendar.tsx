@@ -51,13 +51,13 @@ export default function AdminCalendar() {
   // For filtering by dentist
   const [selectedDentistId, setSelectedDentistId] = useState<string>('');
 
+  // For the “Go to date” feature
+  const [searchDate, setSearchDate] = useState('');
+
   // For the appointment modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createDate, setCreateDate] = useState<Date | null>(null);
-
-  // “Go to date” feature
-  const [searchDate, setSearchDate] = useState('');
 
   // 1) FETCH Schedules data
   const { data: scheduleData } = useQuery<SchedulesResponse>({
@@ -84,7 +84,7 @@ export default function AdminCalendar() {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
       // Request a large number of appointments so they all display in the calendar
       const response = await getAppointments(1, 300, dentistIdNum);
-      return response.data; // shape: { appointments: [...], meta: {...} }
+      return response.data; // { appointments: [...], meta: {...} }
     },
   });
 
@@ -97,27 +97,28 @@ export default function AdminCalendar() {
     },
   });
 
-  // Build the events from appointments:
-  const appointments = apptData?.appointments || [];
-  // If you only want to see “non-cancelled,” you could filter, but typically
-  // you might want to see them all. Let’s show them all for now:
+  // Build the events from appointments, excluding those with status === 'cancelled'
+  let appointments = apptData?.appointments || [];
+  appointments = appointments.filter((appt) => appt.status !== 'cancelled');
+
+  // Convert appointments => FullCalendar events
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    // If you store a duration in the appointment_type, we can compute an end:
+    // If you store a duration in appointmentType, we can compute an end:
     const dur = appt.appointmentType?.duration ?? 60;
     const end = new Date(start.getTime() + dur * 60_000);
 
-    // Pick a color based on status:
+    // Color based on status:
     let backgroundColor = '#86efac'; // default for "scheduled"
     if (appt.status === 'completed') {
       backgroundColor = '#93c5fd'; // light blue
     } else if (appt.status === 'cancelled') {
-      backgroundColor = '#fca5a5'; // light red
+      backgroundColor = '#fca5a5'; // red
     }
 
     // Possibly highlight “checkedIn”
     if (appt.checkedIn) {
-      backgroundColor = '#fcd34d'; // gold, for example
+      backgroundColor = '#fcd34d'; // gold/yellow for arrived
     }
 
     return {
@@ -148,6 +149,7 @@ export default function AdminCalendar() {
 
   // FULLCALENDAR handlers
   const handleSelect = useCallback((selectInfo: SelectArg) => {
+    // We create a new appt on that day
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
     setIsModalOpen(true);
@@ -160,10 +162,8 @@ export default function AdminCalendar() {
   }, []);
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
-    if (clickInfo.event.display === 'background') {
-      // That’s a closed-day background event
-      return;
-    }
+    // If background => that’s a closed day
+    if (clickInfo.event.display === 'background') return;
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
     if (appt) {
       setEditingAppointment(appt);
@@ -192,9 +192,7 @@ export default function AdminCalendar() {
         return;
       }
       try {
-        await updateAppointment(appt.id, {
-          appointment_time: event.start.toISOString(),
-        });
+        await updateAppointment(appt.id, { appointment_time: event.start.toISOString() });
         queryClient.invalidateQueries(['admin-appointments-for-calendar', selectedDentistId]);
       } catch (err: any) {
         toast.error('Could not reschedule appointment.');
@@ -205,7 +203,7 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // Not supporting changing end time via drag-resize => revert
+    // Not supporting changing end time by drag-resize => revert
     resizeInfo.revert();
   }, []);
 
@@ -218,11 +216,7 @@ export default function AdminCalendar() {
     );
   }
 
-  const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5];
-  const openTime = scheduleData?.clinicOpenTime ?? '09:00';
-  const closeTime = scheduleData?.clinicCloseTime ?? '17:00';
-
-  // “Go to date” handler
+  // “Go to date” form submit
   function handleGoToDate(e: FormEvent) {
     e.preventDefault();
     if (!searchDate) return;
@@ -233,6 +227,10 @@ export default function AdminCalendar() {
     }
     calendarRef.current?.getApi().gotoDate(parsed);
   }
+
+  const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5];
+  const openTime = scheduleData?.clinicOpenTime ?? '09:00';
+  const closeTime = scheduleData?.clinicCloseTime ?? '17:00';
 
   return (
     <div className="space-y-6">
@@ -303,7 +301,6 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        // Show from 7am - 7pm for example
         slotMinTime="07:00:00"
         slotMaxTime="19:00:00"
         slotDuration="00:15:00"
