@@ -1,14 +1,14 @@
 // File: /src/pages/Admin/Dashboard/AppointmentsList.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import Button from '../../../components/UI/Button';
 import AdminAppointmentCard from './AdminAppointmentCard';
 import AdminAppointmentModal from './AdminAppointmentModal';
-// Import your API helpers
-import { api, getDentists } from '../../../lib/api'; 
+import { api, getDentists } from '../../../lib/api'; // your API helpers
 import type { Appointment, Dentist } from '../../../types';
 
+// Shape of the paginated response
 interface PaginatedAppointments {
   appointments: Appointment[];
   meta: {
@@ -19,13 +19,13 @@ interface PaginatedAppointments {
   };
 }
 
-/**
- * We fetch appointments with optional filters:
- *  - page
- *  - status (scheduled, completed, etc.)
- *  - q (search query: can match name, email, or ID)
- *  - dentist_id
- *  - date (YYYY-MM-DD)
+/** 
+ * Fetch appointments with optional filters:
+ * - page
+ * - status
+ * - q (search query: forced to lowercase)
+ * - dentist_id
+ * - date (YYYY-MM-DD)
  */
 async function fetchAppointments(
   page: number,
@@ -34,73 +34,105 @@ async function fetchAppointments(
   dentistId: string,
   date: string
 ): Promise<PaginatedAppointments> {
-  // Build the params object
   const params: any = {
     page,
     per_page: 10,
   };
-
-  // Only include status if non-empty
-  if (status) params.status = status;
-
-  // If dentistId is not empty => pass it
+  if (status)    params.status     = status;
   if (dentistId) params.dentist_id = dentistId;
-
-  // If date => pass it
-  if (date) params.date = date;
-
-  // If q => pass it as all-lowercase
-  if (q.trim()) params.q = q.toLowerCase();
+  if (date)      params.date       = date;
+  if (q.trim())  params.q          = q.toLowerCase();
 
   const response = await api.get('/appointments', { params });
   return response.data;
 }
 
 export default function AppointmentsList() {
-  // Pagination
-  const [page, setPage] = useState<number>(1);
+  // ------------------------------------
+  // PAGINATION & FILTER STATES
+  // ------------------------------------
+  const [page, setPage] = useState(1);
 
-  // Filters
+  // Search
   const [searchTerm, setSearchTerm] = useState('');
-  // We'll store the *debounced* searchTerm so we only re-query after a short delay
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  const [selectedDentistId, setSelectedDentistId] = useState(''); // empty => all
+  // Dentist dropdown
+  const [selectedDentistId, setSelectedDentistId] = useState('');
+
+  // Date filter
   const [date, setDate] = useState('');
+
+  // Status (scheduled, completed, etc.)
   const [status, setStatus] = useState('scheduled');
 
-  // Create-Appointment modal
+  // ------------------------------------
+  // MODAL: Create Appointment
+  // ------------------------------------
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // ----------------------------------------------------------------
-  // 1) Dentist list for the dropdown
-  // ----------------------------------------------------------------
+  // ------------------------------------
+  // SEARCH INPUT FOCUS HANDLING
+  // ------------------------------------
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // This boolean tracks whether the user is still "actively" in the search box
+  // or wants it re-focused after re-renders. We'll set it false onBlur.
+  const [isSearchFocused, setIsSearchFocused] = useState(true);
+
+  // onChange => user typed => keep the search box focused
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+    // If the user typed, let’s keep focus
+    setIsSearchFocused(true);
+  };
+
+  // onFocus => user is actively focusing the field
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
+  };
+
+  // onBlur => user clicked away => do not auto-refocus
+  const handleSearchBlur = () => {
+    setIsSearchFocused(false);
+  };
+
+  // On every re-render, if we want to keep focus => do so
+  useEffect(() => {
+    if (isSearchFocused) {
+      searchRef.current?.focus();
+    }
+  });
+
+  // ------------------------------------
+  // DEBOUNCE searchTerm => debouncedTerm
+  // ------------------------------------
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // ------------------------------------
+  // FETCH DENTISTS (for the dropdown)
+  // ------------------------------------
   const {
     data: dentistList,
     isLoading: isDentistLoading,
     error: dentistError,
   } = useQuery<Dentist[]>({
-    queryKey: ['all-dentists'], // or any key
+    queryKey: ['all-dentists'],
     queryFn: async () => {
       const res = await getDentists();
       return res.data; // array of Dentist
     },
   });
 
-  // ----------------------------------------------------------------
-  // 2) Debounce logic for searchTerm
-  // ----------------------------------------------------------------
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // ----------------------------------------------------------------
-  // 3) Query for the appointments
-  // ----------------------------------------------------------------
+  // ------------------------------------
+  // FETCH APPOINTMENTS
+  // ------------------------------------
   const {
     data,
     isLoading,
@@ -112,20 +144,19 @@ export default function AppointmentsList() {
       'admin-appointments',
       page,
       status,
-      debouncedSearchTerm,
+      debouncedTerm,
       selectedDentistId,
       date,
     ],
     queryFn: () =>
-      fetchAppointments(page, status, debouncedSearchTerm, selectedDentistId, date),
+      fetchAppointments(page, status, debouncedTerm, selectedDentistId, date),
     keepPreviousData: true,
   });
 
-  // If no data yet, handle loading / error states
   if (isLoading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full mx-auto"></div>
       </div>
     );
   }
@@ -137,25 +168,28 @@ export default function AppointmentsList() {
     );
   }
 
-  // De-structure the returned object
   const { appointments, meta } = data || { appointments: [], meta: {} };
 
-  // ----------------------------------------------------------------
-  // 4) Clear filters
-  // ----------------------------------------------------------------
+  // ------------------------------------
+  // CLEAR FILTERS
+  // ------------------------------------
   const handleClearFilters = () => {
     setSearchTerm('');
-    setDebouncedSearchTerm('');
+    setDebouncedTerm('');
     setSelectedDentistId('');
     setDate('');
     setStatus('scheduled');
     setPage(1);
+
+    // We want to re-focus the search bar after clearing
+    setIsSearchFocused(true);
   };
 
   return (
     <div className="space-y-6">
-      {/* Filters Card */}
+      {/* FILTERS */}
       <div className="bg-white p-6 rounded-md shadow-md space-y-4">
+        {/* Row of inputs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search input */}
           <div>
@@ -163,15 +197,15 @@ export default function AppointmentsList() {
               Search
             </label>
             <input
+              ref={searchRef}
               type="text"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder='Name, Email, or ID'
+              onChange={handleSearchChange}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Name, Email, or ID"
             />
           </div>
 
@@ -186,8 +220,8 @@ export default function AppointmentsList() {
                 setSelectedDentistId(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Dentists</option>
               {!isDentistLoading && dentistList?.map((dentist) => (
@@ -210,8 +244,8 @@ export default function AppointmentsList() {
                 setDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -226,8 +260,8 @@ export default function AppointmentsList() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="scheduled">Scheduled</option>
               <option value="completed">Completed</option>
@@ -238,7 +272,7 @@ export default function AppointmentsList() {
           </div>
         </div>
 
-        {/* Clear Filters Button */}
+        {/* Clear filters button */}
         <div className="text-right">
           <Button variant="outline" onClick={handleClearFilters}>
             Clear Filters
@@ -246,7 +280,7 @@ export default function AppointmentsList() {
         </div>
       </div>
 
-      {/* Create New Appointment */}
+      {/* New Appointment button */}
       <div className="text-right">
         <Button
           variant="primary"
@@ -258,7 +292,7 @@ export default function AppointmentsList() {
         </Button>
       </div>
 
-      {/* Appointments List */}
+      {/* APPOINTMENTS LIST */}
       <div className="bg-white p-6 rounded-md shadow-md">
         {appointments && appointments.length > 0 ? (
           <div className="space-y-4">
@@ -271,7 +305,7 @@ export default function AppointmentsList() {
         )}
       </div>
 
-      {/* Pagination */}
+      {/* PAGINATION */}
       <div className="flex justify-center items-center mt-6 space-x-4">
         <button
           onClick={() => setPage((old) => Math.max(old - 1, 1))}
@@ -297,18 +331,17 @@ export default function AppointmentsList() {
           Next
         </button>
       </div>
-
       {isFetching && (
         <div className="text-center text-sm text-gray-500 mt-2">
           Loading...
         </div>
       )}
 
-      {/* Create / Edit Appointment Modal */}
+      {/* Create/Edit Appointment Modal */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        editingAppointment={null} // null => create mode
+        editingAppointment={null}
       />
     </div>
   );

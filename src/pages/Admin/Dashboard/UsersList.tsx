@@ -1,6 +1,5 @@
 // File: /src/pages/Admin/Dashboard/UsersList.tsx
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchUsers, getUsers } from '../../../lib/api';
 import type { User } from '../../../types';
@@ -12,30 +11,59 @@ interface UsersApiResponse {
   users: User[];
   meta: {
     currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    perPage: number;
+    totalPages:  number;
+    totalCount:  number;
+    perPage:     number;
   };
 }
 
 export default function UsersList() {
-  // Pagination & search
+  // Pagination
   const [page, setPage] = useState(1);
+
+  // Search
   const [searchTerm, setSearchTerm] = useState('');
-  // Debounce the search input
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  // Manage our “New User / Edit User” modal
+  // Manage “New / Edit User” modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
+  // **Ref** for the search input (to keep focus)
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Track if user wants the search input to remain focused
+  const [isSearchFocused, setIsSearchFocused] = useState(true);
+
+  // On every render, if we want it focused => do so
+  useEffect(() => {
+    if (isSearchFocused) {
+      searchRef.current?.focus();
+    }
+  });
+
+  // onChange => user typed => keep focusing
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPage(1);
+    setSearchTerm(e.target.value);
+    setIsSearchFocused(true);
+  };
+
+  // If user physically focuses the field
+  const handleSearchFocus = () => setIsSearchFocused(true);
+
+  // If user physically clicks away
+  const handleSearchBlur = () => setIsSearchFocused(false);
+
   // Debounce effect
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
+    const handler = setTimeout(() => {
+      setDebouncedTerm(searchTerm);
+    }, 500);
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Query the user list (filtered by name/email if `debouncedTerm`)
+  // Query the user list
   const {
     data,
     isLoading,
@@ -46,7 +74,7 @@ export default function UsersList() {
     queryKey: ['users', page, debouncedTerm],
     queryFn: async () => {
       if (debouncedTerm.trim()) {
-        const response = await searchUsers(debouncedTerm.trim(), page, 10);
+        const response = await searchUsers(debouncedTerm.trim().toLowerCase(), page, 10);
         return response.data;
       } else {
         const response = await getUsers(page, 10);
@@ -56,11 +84,10 @@ export default function UsersList() {
     keepPreviousData: true,
   });
 
-  // If loading or error
   if (isLoading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full mx-auto"></div>
       </div>
     );
   }
@@ -71,21 +98,29 @@ export default function UsersList() {
       </div>
     );
   }
-
   if (!data) {
     return <div className="text-center py-12">No user data found.</div>;
   }
-
   const { users, meta } = data;
 
+  // Create new user
   function openCreateModal() {
-    setEditingUser(null);   // indicates we are creating new
+    setEditingUser(null);
     setIsModalOpen(true);
   }
 
+  // Edit existing user
   function openEditModal(user: User) {
-    setEditingUser(user);   // indicates we are editing
+    setEditingUser(user);
     setIsModalOpen(true);
+  }
+
+  // Clear search => re-focus
+  function handleClearSearch() {
+    setSearchTerm('');
+    setDebouncedTerm('');
+    setPage(1);
+    setIsSearchFocused(true);
   }
 
   return (
@@ -98,16 +133,23 @@ export default function UsersList() {
           Search by Name or Email
         </label>
         <input
+          ref={searchRef}
           type="text"
           value={searchTerm}
-          onChange={(e) => {
-            setPage(1);
-            setSearchTerm(e.target.value);
-          }}
+          onChange={handleSearchChange}
+          onFocus={handleSearchFocus}
+          onBlur={handleSearchBlur}
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           placeholder='e.g. "Jane", "user@example.com"'
         />
+
+        {/* Clear button */}
+        <div className="mt-2">
+          <Button variant="outline" onClick={handleClearSearch}>
+            Clear Search
+          </Button>
+        </div>
       </div>
 
       {/* CREATE NEW USER BUTTON */}
@@ -132,17 +174,15 @@ export default function UsersList() {
                 {u.email ? ` (${u.email})` : ''}
               </p>
               <p className="text-sm text-gray-500">Role: {u.role}</p>
-              {/* If phone is present */}
               {u.phone && (
                 <p className="text-sm text-gray-500">Phone: {u.phone}</p>
               )}
             </div>
-            {/* Optionally you can show an arrow icon here or nothing. */}
           </div>
         ))}
       </div>
 
-      {/* PAGINATION CONTROLS */}
+      {/* PAGINATION */}
       <div className="flex justify-center items-center mt-8 space-x-4">
         <Button
           variant="outline"
@@ -151,11 +191,9 @@ export default function UsersList() {
         >
           Previous
         </Button>
-
         <span className="text-gray-600">
           Page {meta.currentPage} of {meta.totalPages}
         </span>
-
         <Button
           variant="outline"
           onClick={() => {
@@ -180,7 +218,7 @@ export default function UsersList() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         existingUser={editingUser}
-        afterSave={() => refetch()}  // refresh the user list
+        afterSave={() => refetch()}
       />
     </div>
   );
