@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { createUser, updateUser, deleteUser, promoteUser } from '../../../lib/api';
+import { createUser, updateUser, deleteUser } from '../../../lib/api'; // removed promoteUser
 import { useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
 import Input from '../../../components/UI/Input';
@@ -17,46 +17,53 @@ interface UserModalProps {
 }
 
 /**
- * Admin can create or update a user.
- * Now email and role must be required fields.
+ * Admin can create or edit a user in this modal.
+ * - Moves "Role" to the top, so that the admin chooses it first.
+ * - Removes the "Promote to Admin" button in favor of just selecting "Admin" in the Role dropdown.
  */
 export default function UserModal({
   isOpen,
   onClose,
   existingUser,
-  afterSave
+  afterSave,
 }: UserModalProps) {
   const queryClient = useQueryClient();
 
   // Form fields
+  const [role,      setRole]      = useState<'user' | 'admin' | 'phone_only'>('user');
   const [firstName, setFirstName] = useState('');
   const [lastName,  setLastName]  = useState('');
   const [phone,     setPhone]     = useState('');
   const [email,     setEmail]     = useState('');
-  const [role,      setRole]      = useState<'user' | 'admin' | 'phone_only'>('user');
 
   useEffect(() => {
     if (!isOpen) return;
 
     if (existingUser) {
-      // Editing
+      // Editing an existing user => populate fields
+      setRole(existingUser.role as 'user' | 'admin' | 'phone_only');
       setFirstName(existingUser.firstName);
       setLastName(existingUser.lastName);
       setPhone(existingUser.phone || '');
       setEmail(existingUser.email || '');
-      setRole(existingUser.role as 'user' | 'admin' | 'phone_only');
     } else {
-      // Creating new => blank out
+      // Creating new => blank fields
+      setRole('user');
       setFirstName('');
       setLastName('');
       setPhone('');
       setEmail('');
-      setRole('user');
     }
   }, [isOpen, existingUser]);
 
+  const isEditing = !!existingUser;
+
   async function handleSave() {
     // Validate form
+    if (!role) {
+      toast.error('Role is required.');
+      return;
+    }
     if (!firstName.trim()) {
       toast.error('First name is required.');
       return;
@@ -69,40 +76,35 @@ export default function UserModal({
       toast.error('Phone number is required.');
       return;
     }
-    // As requested: Always require email and role (even if phone_only).
     if (!email.trim()) {
       toast.error('Email is required.');
       return;
     }
-    if (!role) {
-      toast.error('Role is required.');
-      return;
-    }
 
     try {
-      if (existingUser) {
-        // Update existing
+      if (isEditing && existingUser) {
+        // Update existing user
         await updateUser(existingUser.id, {
+          role,
           firstName,
           lastName,
           phone,
           email: email.trim(),
-          role,
         });
         toast.success('User updated!');
       } else {
-        // Create new
+        // Create new user (invitation-based if email is provided)
         await createUser({
+          role,
           firstName,
           lastName,
           phone,
           email: email.trim(),
-          // no password => the backend sends invite link if email is present
-          role,
         });
-        toast.success('User created! (Invitation email sent if email was provided.)');
+        toast.success('User created!');
       }
 
+      // Refresh the users list
       queryClient.invalidateQueries(['users']);
       afterSave?.();
       onClose();
@@ -128,33 +130,12 @@ export default function UserModal({
     }
   }
 
-  async function handlePromote() {
-    if (!existingUser) return;
-    if (existingUser.role === 'admin') {
-      toast.error('They are already admin.');
-      return;
-    }
-
-    try {
-      await promoteUser(existingUser.id);
-      toast.success('User promoted to admin!');
-      queryClient.invalidateQueries(['users']);
-      afterSave?.();
-      onClose();
-    } catch (err: any) {
-      toast.error(`Failed to promote: ${err.message}`);
-    }
-  }
-
   if (!isOpen) return null;
-
-  const isEditing = !!existingUser;
-  const isAlreadyAdmin = existingUser?.role === 'admin';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white w-full max-w-lg rounded-md shadow-md">
-        {/* HEADER */}
+        {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit User' : 'Create New User'}
@@ -164,8 +145,24 @@ export default function UserModal({
           </button>
         </div>
 
-        {/* BODY: FORM FIELDS */}
+        {/* Body: form fields */}
         <div className="p-4 space-y-4">
+          {/* Role at the top */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Role <span className="text-red-500">*</span>
+            </label>
+            <select
+              className="border w-full rounded-md px-3 py-2"
+              value={role}
+              onChange={(e) => setRole(e.target.value as 'user' | 'admin' | 'phone_only')}
+            >
+              <option value="user">Regular User</option>
+              <option value="admin">Admin</option>
+              <option value="phone_only">Phone-Only</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="First Name"
@@ -188,11 +185,6 @@ export default function UserModal({
             required
           />
 
-          {/*
-            As per your new requirement:
-            "As an admin, the 'Edit User' modal should have the email and role be required as well"
-            We'll always show email with required
-          */}
           <Input
             label="Email"
             type="email"
@@ -200,35 +192,11 @@ export default function UserModal({
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role <span className="text-red-500">*</span>
-            </label>
-            <select
-              className="border w-full rounded-md px-3 py-2"
-              value={role}
-              onChange={(e) =>
-                setRole(e.target.value as 'user' | 'admin' | 'phone_only')
-              }
-              required
-            >
-              <option value="user">Regular User</option>
-              <option value="admin">Admin</option>
-              <option value="phone_only">Phone-Only</option>
-            </select>
-          </div>
         </div>
 
-        {/* FOOTER: ACTION BUTTONS */}
+        {/* Footer: action buttons */}
         <div className="flex justify-end items-center space-x-4 p-4 border-t">
-          {/* If editing, show Promote or Delete */}
-          {isEditing && !isAlreadyAdmin && (
-            <Button variant="outline" onClick={handlePromote}>
-              Promote to Admin
-            </Button>
-          )}
-
+          {/* If editing, show Delete */}
           {isEditing && (
             <Button variant="danger" onClick={handleDelete}>
               Delete
@@ -238,6 +206,7 @@ export default function UserModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
+
           <Button variant="primary" onClick={handleSave}>
             {isEditing ? 'Save Changes' : 'Create User'}
           </Button>
