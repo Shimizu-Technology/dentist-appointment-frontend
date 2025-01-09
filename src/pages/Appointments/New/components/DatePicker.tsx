@@ -1,15 +1,14 @@
 // File: /src/pages/Appointments/New/components/DatePicker.tsx
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DayPicker } from 'react-day-picker';
-import { format, addMonths, isBefore, isAfter } from 'date-fns';
+import { format, addMonths, isBefore, isAfter, parseISO } from 'date-fns';
 import { useFormContext, useWatch } from 'react-hook-form';
-import 'react-day-picker/style.css'; // Make sure this is imported somewhere globally
+import 'react-day-picker/style.css';
 
 import { getSchedules, getDentistAvailability } from '../../../../lib/api';
 
-// Types your server might return
 interface DentistUnavailability {
   id: number;
   dentistId: number;
@@ -28,7 +27,7 @@ interface ClosedDay {
 interface SchedulesResponse {
   clinicOpenTime: string;
   clinicCloseTime: string;
-  openDays: number[];             // e.g. [1,2,3,4,5] => Monday..Friday
+  openDays: number[]; // e.g. [1,2,3,4,5]
   closedDays: ClosedDay[];
   dentistUnavailabilities: DentistUnavailability[];
 }
@@ -40,13 +39,28 @@ export default function DatePicker() {
   const dentistId = useWatch({ control, name: 'dentist_id' });
   const selectedDateStr = useWatch({ control, name: 'appointment_date' });
 
-  // For controlling the “month” the calendar is showing
-  const [month, setMonth] = useState<Date>(() => {
-    // If you want the calendar to default to something, use a date a bit in the future or “today”
-    return new Date(); // Start with current month
-  });
+  // 1) Convert the string "YYYY-MM-DD" => Date
+  //    We use parseISO if we like, or just new Date(dateStr).
+  //    We store undefined if it’s invalid or blank.
+  const selectedDate = useMemo(() => {
+    if (!selectedDateStr) return undefined;
+    // safer parse:
+    const parsed = parseISO(selectedDateStr);
+    return isNaN(parsed.getTime()) ? undefined : parsed;
+  }, [selectedDateStr]);
 
-  // 1) Query global schedules (openDays, closedDays, etc.)
+  // 2) State for controlling which month the calendar is showing
+  //    We start with selectedDate if available, or "today" otherwise.
+  const [month, setMonth] = useState<Date>(selectedDate || new Date());
+
+  // If the selectedDate changes (e.g., the form resets), update the calendar month
+  useEffect(() => {
+    if (selectedDate) {
+      setMonth(selectedDate);
+    }
+  }, [selectedDate]);
+
+  // 3) Schedules & Dentist Unavailability queries
   const {
     data: scheduleData,
     isLoading: scheduleLoading,
@@ -59,7 +73,6 @@ export default function DatePicker() {
     },
   });
 
-  // 2) Dentist unavailability
   const {
     data: dentistUnavailData = [],
     isLoading: dentistLoading,
@@ -74,26 +87,26 @@ export default function DatePicker() {
     enabled: !!dentistId,
   });
 
-  // Create a minDate (today) / maxDate (6 mo. in future)
+  // 4) We limit the day range to within 6 months from now
   const minDate = new Date();
   const maxDate = addMonths(minDate, 6);
 
-  // Figure out if a day is disabled
+  // 5) Determine whether a day is disabled
   const isDayDisabled = useCallback(
     (day: Date): boolean => {
-      // If we are still loading schedule data, or no data yet, just disable everything
+      // If no schedule data yet, we disable all days
       if (!scheduleData) return true;
 
-      // 1) If day < today or day > max => disable
+      // (a) Out of min/max range
       if (isBefore(day, minDate) || isAfter(day, maxDate)) return true;
 
-      // 2) If day’s weekday is not in openDays
-      const wday = day.getDay(); // 0=Sun,1=Mon,2=Tue,...
+      // (b) If day’s weekday is not in openDays
+      const wday = day.getDay(); // 0=Sun,1=Mon, etc.
       if (!scheduleData.openDays.includes(wday)) {
         return true;
       }
 
-      // 3) If day is in closedDays
+      // (c) If day is in closedDays
       const dateStr = format(day, 'yyyy-MM-dd');
       const isGloballyClosed = scheduleData.closedDays.some(
         (cd) => cd.date === dateStr
@@ -102,7 +115,7 @@ export default function DatePicker() {
         return true;
       }
 
-      // 4) If dentist has an unavailability that blocks the *entire* day
+      // (d) If this dentist has an all-day unavailability on that date
       const blocked = dentistUnavailData.some((u) => u.date === dateStr);
       if (blocked) {
         return true;
@@ -110,17 +123,10 @@ export default function DatePicker() {
 
       return false;
     },
-    [scheduleData, dentistUnavailData]
+    [scheduleData, dentistUnavailData, minDate, maxDate]
   );
 
-  // Convert selectedDateStr => actual Date
-  const selectedDate = useMemo(() => {
-    if (!selectedDateStr) return undefined;
-    const dt = new Date(selectedDateStr);
-    return isNaN(dt.getTime()) ? undefined : dt;
-  }, [selectedDateStr]);
-
-  // Handler: when user clicks a day
+  // 6) When a user selects a day
   const handleDayClick = (day: Date | undefined) => {
     if (!day) return;
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -128,11 +134,11 @@ export default function DatePicker() {
       shouldTouch: true,
       shouldValidate: true,
     });
-    // Clear the time field so they re-pick after date changes
+    // Clear the time field if changing date
     setValue('appointment_time', '');
   };
 
-  // Rendering states
+  // 7) Handle loading / error states
   if (scheduleLoading || dentistLoading) {
     return <p className="text-gray-500 mt-2">Loading schedule...</p>;
   }
@@ -149,26 +155,23 @@ export default function DatePicker() {
     return <p className="text-gray-500 mt-2">Please select a dentist first.</p>;
   }
 
+  // 8) Render the DayPicker
   return (
     <div className="my-4">
-      <p className="mb-2 text-sm text-gray-700 font-medium">Pick an Appointment Date</p>
+      <label className="mb-2 text-sm text-gray-700 font-medium block">
+        Pick an Appointment Date
+      </label>
 
       <DayPicker
-        // "single" selection mode
         mode="single"
-        // Which month to show
         month={month}
         onMonthChange={setMonth}
-        // If you’d like to limit navigation, do:
-        // startMonth={minDate}
-        // endMonth={maxDate}
-        // We rely on `isDayDisabled` instead of fromDate/toDate
+        // If you also want to limit user navigation
+        // fromDate={minDate}
+        // toDate={maxDate}
         selected={selectedDate}
         onSelect={(day) => handleDayClick(day ?? undefined)}
-        // This function decides if a day is disabled
         disabled={isDayDisabled}
-        // You can set the defaultMonth to something else if you prefer
-        defaultMonth={new Date()} 
       />
     </div>
   );

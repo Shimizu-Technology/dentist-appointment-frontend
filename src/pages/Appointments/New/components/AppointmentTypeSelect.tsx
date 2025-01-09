@@ -5,9 +5,10 @@ import { useFormContext } from 'react-hook-form';
 import type { AppointmentType } from '../../../../types';
 
 export default function AppointmentTypeSelect() {
-  const { register, formState: { errors } } = useFormContext();
+  const { register, formState: { errors }, watch } = useFormContext();
+  const selectedTypeId = watch('appointment_type_id');
 
-  const { data: appointmentTypes } = useQuery<AppointmentType[]>({
+  const { data: appointmentTypes, isLoading } = useQuery<AppointmentType[]>({
     queryKey: ['appointmentTypes'],
     queryFn: async () => {
       const response = await getAppointmentTypes();
@@ -15,10 +16,18 @@ export default function AppointmentTypeSelect() {
     },
   });
 
+  if (isLoading) {
+    return (
+      <div className="text-gray-500 mt-2">
+        Loading appointment types...
+      </div>
+    );
+  }
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        Appointment Type <span className="text-red-500 ml-1">*</span>
+        Appointment Type <span className="text-red-500">*</span>
       </label>
       <select
         {...register('appointment_type_id', {
@@ -28,7 +37,7 @@ export default function AppointmentTypeSelect() {
       >
         <option value="">Select type of appointment</option>
         {appointmentTypes?.map((type) => (
-          <option key={type.id} value={type.id}>
+          <option key={type.id} value={String(type.id)}>
             {type.name} ({type.duration} minutes)
           </option>
         ))}
@@ -36,7 +45,7 @@ export default function AppointmentTypeSelect() {
 
       {errors.appointment_type_id && (
         <p className="mt-1 text-sm text-red-600">
-          {errors.appointment_type_id.message as string}
+          {String(errors.appointment_type_id.message)}
         </p>
       )}
     </div>

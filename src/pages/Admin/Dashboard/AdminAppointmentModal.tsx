@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createAppointment,
   updateAppointment,
-  cancelAppointment
+  cancelAppointment,
 } from '../../../lib/api';
 
 import DentistSelect from '../../../pages/Appointments/New/components/DentistSelect';
@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 
 interface Appointment {
   id: number;
-  appointmentTime: string;
+  appointmentTime: string; // e.g. "2025-01-08T12:45:00Z"
   dentistId: number;
   appointmentTypeId: number;
   notes?: string;
@@ -39,16 +39,16 @@ interface AdminAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   editingAppointment: Appointment | null;
-  defaultDate?: Date | null;
-  defaultDentistId?: number;
+  defaultDate?: Date | null;     // optional if you want a “create” default date
+  defaultDentistId?: number;     // optional if you want a “create” default dentist
 }
 
 interface FormData {
   user_id?: string;
   dentist_id: string;
   appointment_type_id: string;
-  appointment_date: string;
-  appointment_time: string;
+  appointment_date: string;  // "YYYY-MM-DD"
+  appointment_time: string;  // "HH:mm"
   notes?: string;
   checked_in?: boolean;
 }
@@ -62,39 +62,46 @@ export default function AdminAppointmentModal({
 }: AdminAppointmentModalProps) {
   const queryClient = useQueryClient();
   const isEditing = !!editingAppointment;
+
+  // We store the selected user id if creating a new appointment.
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  const methods = useForm<FormData>({ mode: 'onChange' });
+  const methods = useForm<FormData>({
+    mode: 'onChange',
+  });
   const {
     handleSubmit,
     reset,
+    watch,
     register,
-    formState: { isSubmitting, isValid, errors },
+    formState: { isSubmitting, isValid },
   } = methods;
 
-  // Enforce required fields
-  useEffect(() => {
-    register('user_id', {
-      required: !isEditing ? 'Please select a user' : false,
-    });
-    register('appointment_date', {
-      required: 'Please pick an appointment date',
-    });
-    register('appointment_time', {
-      required: 'Please pick an appointment time slot',
-    });
-  }, [register, isEditing]);
+  // If editing => we show a "Currently scheduled" line
+  let originalTimeString = '';
+  if (isEditing && editingAppointment) {
+    const oldDateObj = new Date(editingAppointment.appointmentTime);
+    originalTimeString = format(oldDateObj, 'MMMM d, yyyy h:mm aa');
+  }
 
+  // Whenever the modal becomes “open” or the `editingAppointment` changes,
+  // we reset the form fields so that the first click is populated correctly.
   useEffect(() => {
     if (!isOpen) return;
-
-    if (isEditing && editingAppointment) {
+    if (editingAppointment) {
+      // Parse the existing date/time into "YYYY-MM-DD" and "HH:mm"
       const dt = new Date(editingAppointment.appointmentTime);
-      const dateStr = dt.toISOString().split('T')[0];
-      const timeStr = dt.toTimeString().slice(0, 5);
+      const isValidDate = !isNaN(dt.getTime());
+
+      const dateStr = isValidDate
+        ? dt.toISOString().split('T')[0] // => "2025-01-08"
+        : '';
+      const hh = dt.getHours().toString().padStart(2, '0');
+      const mm = dt.getMinutes().toString().padStart(2, '0');
+      const timeStr = isValidDate ? `${hh}:${mm}` : '';
 
       reset({
-        user_id: '', // not used for existing appointments
+        user_id: '', // Not used when editing
         dentist_id: String(editingAppointment.dentistId),
         appointment_type_id: String(editingAppointment.appointmentTypeId),
         appointment_date: dateStr,
@@ -104,34 +111,37 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else {
-      const baseDateStr = defaultDate
-        ? defaultDate.toISOString().split('T')[0]
-        : '';
+      // Creating new appointment
+      const baseDateObj = defaultDate ?? new Date();
+      const baseDateStr = baseDateObj.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
       reset({
         user_id: '',
         dentist_id: defaultDentistId ? String(defaultDentistId) : '',
         appointment_type_id: '',
         appointment_date: baseDateStr,
-        appointment_time: '',
+        appointment_time: '', // blank until user picks a slot
         notes: '',
         checked_in: false,
       });
       setSelectedUserId(null);
     }
-  }, [isOpen, isEditing, editingAppointment, defaultDate, reset, defaultDentistId]);
+  }, [isOpen, editingAppointment, defaultDate, defaultDentistId, reset]);
 
   // CREATE or UPDATE
   const { mutateAsync: mutateAppointment } = useMutation({
     mutationFn: async (data: FormData) => {
+      // Convert date + time => ISO
       const isoString = buildIsoString(data.appointment_date, data.appointment_time);
       const payload: Record<string, any> = {
         appointment_time: isoString,
         dentist_id: parseInt(data.dentist_id, 10),
         appointment_type_id: parseInt(data.appointment_type_id, 10),
-        notes: data.notes,
+        notes: data.notes || '',
         checked_in: !!data.checked_in,
       };
 
+      // If creating new, we need a user_id
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
       }
@@ -142,6 +152,7 @@ export default function AdminAppointmentModal({
       }
     },
     onSuccess: () => {
+      // Re-fetch relevant queries
       queryClient.invalidateQueries(['admin-appointments']);
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
       toast.success(isEditing ? 'Appointment updated!' : 'Appointment created!');
@@ -151,10 +162,6 @@ export default function AdminAppointmentModal({
       toast.error(`Failed to save appointment: ${err.message}`);
     },
   });
-
-  const onSubmit = async (data: FormData) => {
-    await mutateAppointment(data);
-  };
 
   // CANCEL (delete) if editing
   const { mutateAsync: deleteAppointmentMut } = useMutation({
@@ -169,7 +176,7 @@ export default function AdminAppointmentModal({
       onClose();
     },
     onError: (err: any) => {
-      toast.error(`Failed to cancel: ${err.message}`);
+      toast.error(`Failed to delete appointment: ${err.message}`);
     },
   });
 
@@ -180,17 +187,18 @@ export default function AdminAppointmentModal({
     await deleteAppointmentMut();
   };
 
-  let originalTimeString = '';
-  if (isEditing && editingAppointment) {
-    const oldDateObj = new Date(editingAppointment.appointmentTime);
-    originalTimeString = format(oldDateObj, 'MMMM d, yyyy h:mm aa');
-  }
+  const onSubmit = async (data: FormData) => {
+    await mutateAppointment(data);
+  };
+
+  // If we are editing, we skip picking a user. If we are creating, we show the <UserSearchSelect />.
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white w-full max-w-2xl rounded-lg shadow-md">
+        {/* Modal Header */}
         <div className="flex justify-between items-center border-b p-4">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit Appointment' : 'Create Appointment'}
@@ -200,12 +208,11 @@ export default function AdminAppointmentModal({
           </button>
         </div>
 
-        {/* If editing, show user + old date/time info */}
+        {/* If editing, show some read-only info up top */}
         {isEditing && editingAppointment?.user && (
           <div className="px-4 py-2 bg-gray-50 border-b text-sm text-gray-700">
-            <p className="font-medium">Patient:</p>
-            <p>
-              {editingAppointment.user.firstName} {editingAppointment.user.lastName}{' '}
+            <p className="font-medium">
+              Patient: {editingAppointment.user.firstName} {editingAppointment.user.lastName}{' '}
               (<span className="text-gray-600">{editingAppointment.user.email}</span>)
             </p>
             <p className="mt-1">
@@ -216,7 +223,6 @@ export default function AdminAppointmentModal({
 
         <FormProvider {...methods}>
           <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-            {/* If new, pick user (required) */}
             {!isEditing && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -228,11 +234,6 @@ export default function AdminAppointmentModal({
                     setSelectedUserId(String(uid));
                   }}
                 />
-                {errors.user_id && (
-                  <p className="text-red-600 text-sm mt-1">
-                    {String(errors.user_id.message)}
-                  </p>
-                )}
               </div>
             )}
 
@@ -240,21 +241,10 @@ export default function AdminAppointmentModal({
             <AppointmentTypeSelect />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <DatePicker />
+              {/* Pass the existing date if editing */}
+              <DatePicker editingAppointmentId={editingAppointment?.id} />
               <TimeSlotPicker editingAppointmentId={editingAppointment?.id} />
             </div>
-
-            {/* Show errors for date/time if missing */}
-            {errors.appointment_date && (
-              <p className="text-red-600 text-sm">
-                {String(errors.appointment_date.message)}
-              </p>
-            )}
-            {errors.appointment_time && (
-              <p className="text-red-600 text-sm">
-                {String(errors.appointment_time.message)}
-              </p>
-            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -282,6 +272,7 @@ export default function AdminAppointmentModal({
               </div>
             )}
 
+            {/* Footer: Delete (if editing), Cancel, Save */}
             <div className="flex justify-end space-x-4">
               {isEditing && (
                 <Button variant="danger" type="button" onClick={handleDelete}>
@@ -310,6 +301,7 @@ function buildIsoString(dateStr: string, timeStr: string) {
   if (!dateStr || !timeStr) return '';
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
+  // JS Date’s month is 0-based
   const dt = new Date(year, month - 1, day, hour, minute);
   return dt.toISOString();
 }
