@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { createUser, updateUser, deleteUser } from '../../../lib/api'; // removed promoteUser
+import { createUser, updateUser, deleteUser } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
 import Input from '../../../components/UI/Input';
@@ -18,8 +18,8 @@ interface UserModalProps {
 
 /**
  * Admin can create or edit a user in this modal.
- * - Moves "Role" to the top, so that the admin chooses it first.
- * - Removes the "Promote to Admin" button in favor of just selecting "Admin" in the Role dropdown.
+ * - If "phone_only" is selected, we hide the Email field and skip invitation logic.
+ * - Otherwise, for 'user' or 'admin', we require an email (and the system can send invites).
  */
 export default function UserModal({
   isOpen,
@@ -29,25 +29,27 @@ export default function UserModal({
 }: UserModalProps) {
   const queryClient = useQueryClient();
 
-  // Form fields
-  const [role,      setRole]      = useState<'user' | 'admin' | 'phone_only'>('user');
+  // For the role field, we store: 'user', 'admin', or 'phone_only'
+  const [role, setRole] = useState<'user' | 'admin' | 'phone_only'>('user');
   const [firstName, setFirstName] = useState('');
   const [lastName,  setLastName]  = useState('');
   const [phone,     setPhone]     = useState('');
-  const [email,     setEmail]     = useState('');
+  const [email,     setEmail]     = useState(''); // This can be optional if role=phone_only
+
+  const isEditing = !!existingUser;
 
   useEffect(() => {
     if (!isOpen) return;
 
     if (existingUser) {
-      // Editing an existing user => populate fields
+      // Editing
       setRole(existingUser.role as 'user' | 'admin' | 'phone_only');
       setFirstName(existingUser.firstName);
       setLastName(existingUser.lastName);
       setPhone(existingUser.phone || '');
       setEmail(existingUser.email || '');
     } else {
-      // Creating new => blank fields
+      // Creating new => blank out
       setRole('user');
       setFirstName('');
       setLastName('');
@@ -56,14 +58,8 @@ export default function UserModal({
     }
   }, [isOpen, existingUser]);
 
-  const isEditing = !!existingUser;
-
   async function handleSave() {
-    // Validate form
-    if (!role) {
-      toast.error('Role is required.');
-      return;
-    }
+    // 1) Basic validations
     if (!firstName.trim()) {
       toast.error('First name is required.');
       return;
@@ -76,8 +72,10 @@ export default function UserModal({
       toast.error('Phone number is required.');
       return;
     }
-    if (!email.trim()) {
-      toast.error('Email is required.');
+
+    // 2) If not phone_only => email is required
+    if (role !== 'phone_only' && !email.trim()) {
+      toast.error('Email is required for non-phone-only users.');
       return;
     }
 
@@ -89,11 +87,11 @@ export default function UserModal({
           firstName,
           lastName,
           phone,
-          email: email.trim(),
+          email: email.trim(), // might be empty if phone_only => that’s okay
         });
         toast.success('User updated!');
       } else {
-        // Create new user (invitation-based if email is provided)
+        // Create new user
         await createUser({
           role,
           firstName,
@@ -104,7 +102,6 @@ export default function UserModal({
         toast.success('User created!');
       }
 
-      // Refresh the users list
       queryClient.invalidateQueries(['users']);
       afterSave?.();
       onClose();
@@ -135,7 +132,7 @@ export default function UserModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white w-full max-w-lg rounded-md shadow-md">
-        {/* Header */}
+        {/* HEADER */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit User' : 'Create New User'}
@@ -145,9 +142,9 @@ export default function UserModal({
           </button>
         </div>
 
-        {/* Body: form fields */}
+        {/* BODY: FORM FIELDS */}
         <div className="p-4 space-y-4">
-          {/* Role at the top */}
+          {/* Role first */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Role <span className="text-red-500">*</span>
@@ -155,7 +152,9 @@ export default function UserModal({
             <select
               className="border w-full rounded-md px-3 py-2"
               value={role}
-              onChange={(e) => setRole(e.target.value as 'user' | 'admin' | 'phone_only')}
+              onChange={(e) =>
+                setRole(e.target.value as 'user' | 'admin' | 'phone_only')
+              }
             >
               <option value="user">Regular User</option>
               <option value="admin">Admin</option>
@@ -163,6 +162,7 @@ export default function UserModal({
             </select>
           </div>
 
+          {/* First/Last name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="First Name"
@@ -178,6 +178,7 @@ export default function UserModal({
             />
           </div>
 
+          {/* Phone */}
           <Input
             label="Phone (required)"
             value={phone}
@@ -185,18 +186,20 @@ export default function UserModal({
             required
           />
 
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          {/* Email => only show if role != phone_only */}
+          {role !== 'phone_only' && (
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          )}
         </div>
 
-        {/* Footer: action buttons */}
+        {/* FOOTER: ACTION BUTTONS */}
         <div className="flex justify-end items-center space-x-4 p-4 border-t">
-          {/* If editing, show Delete */}
           {isEditing && (
             <Button variant="danger" onClick={handleDelete}>
               Delete
