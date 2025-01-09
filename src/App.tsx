@@ -18,10 +18,10 @@ import NewAppointment from './pages/Appointments/New';
 import AdminDashboard from './pages/Admin/Dashboard';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import AdminRoute from './components/Auth/AdminRoute';
-import FinishInvitation from './pages/FinishInvitation';  // <-- IMPORT the new component
-
-// UPDATED: changed from “/appointments/new/confirmation/:id” to no param.
+import FinishInvitation from './pages/FinishInvitation';
 import BookingConfirmation from './pages/Appointments/New/Confirmation';
+
+import ScrollToTop from './components/ScrollToTop';
 
 const queryClient = new QueryClient();
 
@@ -29,6 +29,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
+        {/* Auto-scroll to top whenever route changes */}
+        <ScrollToTop />
+
         <div className="flex flex-col min-h-screen">
           <Navbar />
 
@@ -41,7 +44,6 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
 
-              {/* Add the finish-invitation route */}
               <Route path="/finish-invitation" element={<FinishInvitation />} />
 
               {/* Protected routes */}
