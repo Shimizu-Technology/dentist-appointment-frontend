@@ -35,32 +35,28 @@ interface SchedulesResponse {
 export default function DatePicker() {
   const { control, setValue } = useFormContext();
 
-  // Watches from your form
+  // 1) Watch the dentist and the currently selected date (string "YYYY-MM-DD")
   const dentistId = useWatch({ control, name: 'dentist_id' });
   const selectedDateStr = useWatch({ control, name: 'appointment_date' });
 
-  // 1) Convert the string "YYYY-MM-DD" => Date
-  //    We use parseISO if we like, or just new Date(dateStr).
-  //    We store undefined if it’s invalid or blank.
+  // 2) Convert "YYYY-MM-DD" -> Date, or undefined if invalid
   const selectedDate = useMemo(() => {
     if (!selectedDateStr) return undefined;
-    // safer parse:
-    const parsed = parseISO(selectedDateStr);
+    const parsed = parseISO(selectedDateStr); // or new Date(selectedDateStr)
     return isNaN(parsed.getTime()) ? undefined : parsed;
   }, [selectedDateStr]);
 
-  // 2) State for controlling which month the calendar is showing
-  //    We start with selectedDate if available, or "today" otherwise.
+  // 3) Use local state to control which month the calendar shows
   const [month, setMonth] = useState<Date>(selectedDate || new Date());
 
-  // If the selectedDate changes (e.g., the form resets), update the calendar month
+  // Whenever the selected date changes (e.g. form resets), jump the calendar to it
   useEffect(() => {
     if (selectedDate) {
       setMonth(selectedDate);
     }
   }, [selectedDate]);
 
-  // 3) Schedules & Dentist Unavailability queries
+  // 4) Fetch schedules and partial unavailabilities
   const {
     data: scheduleData,
     isLoading: scheduleLoading,
@@ -87,26 +83,25 @@ export default function DatePicker() {
     enabled: !!dentistId,
   });
 
-  // 4) We limit the day range to within 6 months from now
+  // 5) Limit selection from [today .. +6 months]
   const minDate = new Date();
   const maxDate = addMonths(minDate, 6);
 
-  // 5) Determine whether a day is disabled
+  // 6) Decide if a day is disabled
   const isDayDisabled = useCallback(
     (day: Date): boolean => {
-      // If no schedule data yet, we disable all days
       if (!scheduleData) return true;
 
-      // (a) Out of min/max range
+      // (a) If day is outside [minDate, maxDate], disable
       if (isBefore(day, minDate) || isAfter(day, maxDate)) return true;
 
-      // (b) If day’s weekday is not in openDays
-      const wday = day.getDay(); // 0=Sun,1=Mon, etc.
+      // (b) If day’s weekday not in scheduleData.openDays, disable
+      const wday = day.getDay(); // 0=Sunday,1=Monday,...
       if (!scheduleData.openDays.includes(wday)) {
         return true;
       }
 
-      // (c) If day is in closedDays
+      // (c) If the clinic is globally closed that day
       const dateStr = format(day, 'yyyy-MM-dd');
       const isGloballyClosed = scheduleData.closedDays.some(
         (cd) => cd.date === dateStr
@@ -115,30 +110,29 @@ export default function DatePicker() {
         return true;
       }
 
-      // (d) If this dentist has an all-day unavailability on that date
-      const blocked = dentistUnavailData.some((u) => u.date === dateStr);
-      if (blocked) {
-        return true;
-      }
+      // (d) REMOVE the old logic that “any unavailability => entire day blocked”
+      // We now allow partial day usage, so we do NOT disable the day
+      // just because unavailability exists.
 
-      return false;
+      return false; // The day is allowed
     },
-    [scheduleData, dentistUnavailData, minDate, maxDate]
+    [scheduleData, minDate, maxDate]
   );
 
-  // 6) When a user selects a day
+  // 7) When user picks a day
   const handleDayClick = (day: Date | undefined) => {
     if (!day) return;
     const dateStr = format(day, 'yyyy-MM-dd');
+    // Update form
     setValue('appointment_date', dateStr, {
       shouldTouch: true,
       shouldValidate: true,
     });
-    // Clear the time field if changing date
+    // Clear the time if changing date
     setValue('appointment_time', '');
   };
 
-  // 7) Handle loading / error states
+  // 8) Show loading/error placeholders
   if (scheduleLoading || dentistLoading) {
     return <p className="text-gray-500 mt-2">Loading schedule...</p>;
   }
@@ -155,7 +149,7 @@ export default function DatePicker() {
     return <p className="text-gray-500 mt-2">Please select a dentist first.</p>;
   }
 
-  // 8) Render the DayPicker
+  // 9) Render
   return (
     <div className="my-4">
       <label className="mb-2 text-sm text-gray-700 font-medium block">
@@ -166,9 +160,6 @@ export default function DatePicker() {
         mode="single"
         month={month}
         onMonthChange={setMonth}
-        // If you also want to limit user navigation
-        // fromDate={minDate}
-        // toDate={maxDate}
         selected={selectedDate}
         onSelect={(day) => handleDayClick(day ?? undefined)}
         disabled={isDayDisabled}

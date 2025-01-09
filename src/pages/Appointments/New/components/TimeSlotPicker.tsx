@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getSchedules,
   getDayAppointments,
-  getAppointmentTypes, // if you need to fetch the actual duration
+  getAppointmentTypes,
 } from '../../../../lib/api';
 import { format } from 'date-fns';
 
@@ -16,17 +16,17 @@ interface TimeSlotPickerProps {
 
 interface DayAppointment {
   id: number;
-  appointmentTime: string; // e.g., "2025-01-10T09:00:00Z"
-  duration: number;         // e.g., 45
+  appointmentTime: string;
+  duration: number;
   status: 'scheduled' | 'completed' | 'cancelled';
 }
 
 interface DentistUnavailability {
   id: number;
   dentistId: number;
-  date: string;      // "YYYY-MM-DD"
-  startTime: string; // "HH:mm"
-  endTime: string;   // "HH:mm"
+  date: string;
+  startTime: string;
+  endTime: string;
 }
 
 interface ClosedDay {
@@ -36,9 +36,9 @@ interface ClosedDay {
 }
 
 interface SchedulesResponse {
-  clinicOpenTime: string;     // e.g. "09:00"
-  clinicCloseTime: string;    // e.g. "17:00"
-  openDays: number[];         // e.g. [1,2,3,4,5]
+  clinicOpenTime: string;
+  clinicCloseTime: string;
+  openDays: number[];
   closedDays: ClosedDay[];
   dentistUnavailabilities: DentistUnavailability[];
 }
@@ -46,20 +46,20 @@ interface SchedulesResponse {
 interface AppointmentType {
   id: number;
   name: string;
-  duration: number; // e.g. 45
+  duration: number;
   description?: string;
 }
 
 export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerProps) {
   const { control, setValue } = useFormContext();
 
-  // Watch fields from the form
+  // 1) Watch fields from the parent form
   const dentistId         = useWatch({ control, name: 'dentist_id' });
   const appointmentDate   = useWatch({ control, name: 'appointment_date' });
   const appointmentTypeId = useWatch({ control, name: 'appointment_type_id' });
   const selectedTime      = useWatch({ control, name: 'appointment_time' });
 
-  // 1) Query the global schedules
+  // 2) Fetch global schedule
   const { data: scheduleData } = useQuery<SchedulesResponse>({
     queryKey: ['schedule-data'],
     queryFn: async () => {
@@ -68,7 +68,7 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
     },
   });
 
-  // 2) Query the day’s appointments
+  // 3) Fetch existing appointments for that day
   const { data: dayAppointments = [] } = useQuery<DayAppointment[]>({
     queryKey: ['day-appointments', dentistId, appointmentDate, editingAppointmentId],
     queryFn: async () => {
@@ -79,64 +79,42 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
     enabled: Boolean(dentistId && appointmentDate),
   });
 
-  // 3) (Optional) If you store appointment type durations in DB, fetch them
-  //    so we can see exactly how long this type is. If you already have them in context
-  //    or you pass them down, you can skip this query.
+  // 4) If the appointment type durations are stored in DB, fetch them
   const { data: allTypes = [] } = useQuery<AppointmentType[]>({
     queryKey: ['appointment-types'],
     queryFn: async () => {
       const res = await getAppointmentTypes();
       return res.data || [];
     },
-    // If you already have them, skip or use a different approach
   });
 
-  // Figure out the duration of the chosen appointment type
-  const chosenType = allTypes.find((t) => t.id === Number(appointmentTypeId));
-  // Fallback if none found:
-  const chosenDuration = chosenType?.duration || 60;
+  const chosenType    = allTypes.find((t) => t.id === Number(appointmentTypeId));
+  const chosenDuration = chosenType?.duration || 60; // fallback
 
-  // 4) Compute the list of free slots
+  // 5) Build a list of free 15-min time slots
   const availableSlots = useMemo(() => {
     if (!dentistId || !appointmentDate || !appointmentTypeId || !scheduleData) return [];
 
-    // Check if day is open or closed
     const dayObj = new Date(appointmentDate);
     if (isNaN(dayObj.getTime())) return [];
 
-    // Day-of-week
+    // If day-of-week not in openDays, or globally closed, we skip
     const wday = dayObj.getDay();
-    if (!scheduleData.openDays.includes(wday)) {
-      // clinic closed
-      return [];
-    }
+    if (!scheduleData.openDays.includes(wday)) return [];
+    if (scheduleData.closedDays.some((cd) => cd.date === appointmentDate)) return [];
 
-    // Check if globally closed
-    const dateStr = appointmentDate;
-    const isClosedDay = scheduleData.closedDays.some((cd) => cd.date === dateStr);
-    if (isClosedDay) return [];
-
-    // Let’s break the day into smaller increments (15 min).
-    const SLOT_INCREMENT = 15; // or 30 if you prefer
-    // Then we use the user’s chosenDuration to see if that slot is fully free.
-
-    // Parse open/close times
-    const [openH, openM] = scheduleData.clinicOpenTime.split(':').map(Number);
+    // Build small increments
+    const SLOT_INCREMENT = 15; // 15-min step
+    const [openH, openM]  = scheduleData.clinicOpenTime.split(':').map(Number);
     const [closeH, closeM] = scheduleData.clinicCloseTime.split(':').map(Number);
 
+    // Generate slot strings "HH:MM"
     const slots: string[] = [];
     let hour = openH;
     let min  = openM;
 
-    // Build small steps from open->close
-    while (
-      hour < closeH ||
-      (hour === closeH && min + SLOT_INCREMENT <= closeM)
-    ) {
-      const hh = String(hour).padStart(2, '0');
-      const mm = String(min).padStart(2, '0');
-      slots.push(`${hh}:${mm}`);
-
+    while (hour < closeH || (hour === closeH && min + SLOT_INCREMENT <= closeM)) {
+      slots.push(`${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
       min += SLOT_INCREMENT;
       if (min >= 60) {
         hour += Math.floor(min / 60);
@@ -144,42 +122,43 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
       }
     }
 
-    // Dentist blocks
-    const dentistBlocks = scheduleData.dentistUnavailabilities.filter(
-      (u) => u.dentistId === Number(dentistId) && u.date === dateStr
+    // Gather that dentist’s unavailability blocks on that date
+    const blocks = scheduleData.dentistUnavailabilities.filter(
+      (b) => b.dentistId === Number(dentistId) && b.date === appointmentDate
     );
 
-    // Filter to see if a block overlaps the entire [slotStart, slotEnd]
-    // where slotEnd = slotStart + chosenDuration
+    // Filter out any slot that overlaps a block or another scheduled appt
     const freeSlots = slots.filter((slotStr) => {
-      const [slotH, slotM] = slotStr.split(':').map(Number);
+      // Convert slot => a start..end range
+      const [sh, sm] = slotStr.split(':').map(Number);
       const slotStart = new Date(dayObj);
-      slotStart.setHours(slotH, slotM, 0, 0);
+      slotStart.setHours(sh, sm, 0, 0);
       const slotEnd = new Date(slotStart.getTime() + chosenDuration * 60_000);
 
-      // (a) Check overlap with dentistBlocks
-      const hasBlockOverlap = dentistBlocks.some((block) => {
-        const [bStartH, bStartM] = block.startTime.split(':').map(Number);
-        const [bEndH, bEndM]     = block.endTime.split(':').map(Number);
-
+      // (a) Check overlap with unavailability
+      const hasBlockOverlap = blocks.some((block) => {
+        const [bsh, bsm] = block.startTime.split(':').map(Number);
+        const [beh, bem] = block.endTime.split(':').map(Number);
         const blockStart = new Date(dayObj);
-        blockStart.setHours(bStartH, bStartM, 0, 0);
+        blockStart.setHours(bsh, bsm, 0, 0);
         const blockEnd = new Date(dayObj);
-        blockEnd.setHours(bEndH, bEndM, 0, 0);
+        blockEnd.setHours(beh, bem, 0, 0);
 
-        // overlap if (slotStart < blockEnd && slotEnd > blockStart)
         return slotStart < blockEnd && slotEnd > blockStart;
       });
       if (hasBlockOverlap) return false;
 
-      // (b) Check overlap with existing “SCHEDULED” appts
+      // (b) Check overlap with existing SCHEDULED appointments
       const activeAppts = dayAppointments.filter((a) => a.status !== 'cancelled');
-      const hasApptOverlap = activeAppts.some((appt) => {
+      const conflicts = activeAppts.some((appt) => {
+        // We have apptStart..apptEnd
         const apptStart = new Date(appt.appointmentTime);
-        const apptEnd   = new Date(apptStart.getTime() + (appt.duration ?? 30) * 60_000);
+        const realDur   = appt.duration || 30;
+        const apptEnd   = new Date(apptStart.getTime() + realDur * 60_000);
+
         return slotStart < apptEnd && slotEnd > apptStart;
       });
-      if (hasApptOverlap) return false;
+      if (conflicts) return false;
 
       return true;
     });
@@ -195,14 +174,15 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
     chosenDuration,
   ]);
 
-  // Display
+  // 6) Utility to show a more readable time
   function displaySlot(slotStr: string) {
     const [h, m] = slotStr.split(':').map(Number);
-    const dummy = new Date();
-    dummy.setHours(h, m, 0, 0);
-    return format(dummy, 'h:mm aa'); // e.g. "9:00 AM"
+    const dt = new Date();
+    dt.setHours(h, m, 0, 0);
+    return format(dt, 'h:mm aa'); // "9:00 AM"
   }
 
+  // 7) When user selects from the dropdown
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setValue('appointment_time', e.target.value, {
       shouldTouch: true,
@@ -210,7 +190,7 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
     });
   };
 
-  // If we have no data or it's not ready
+  // 8) If no schedule data or the user hasn't picked a date, we might show a placeholder
   if (!scheduleData) {
     return <p className="text-gray-500 mt-2">Loading schedule...</p>;
   }
@@ -223,8 +203,8 @@ export default function TimeSlotPicker({ editingAppointmentId }: TimeSlotPickerP
       <select
         value={selectedTime || ''}
         onChange={handleChange}
-        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
         disabled={!dentistId || !appointmentDate || !appointmentTypeId}
+        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
       >
         <option value="">Select a time slot</option>
         {availableSlots.map((slot) => (
