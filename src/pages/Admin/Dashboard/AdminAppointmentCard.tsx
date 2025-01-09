@@ -2,12 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import {
-  Check,
-  Edit2,
-  X,
-  CheckCircle,
-} from 'lucide-react';
+import { Check, Edit2, X, CheckCircle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { cancelAppointment, updateAppointment } from '../../../lib/api';
 import Button from '../../../components/UI/Button';
@@ -49,7 +44,9 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
 
   // Toggle Check-In
   const { mutate: handleCheckInToggle, isLoading: isToggling } = useMutation({
-    mutationFn: () => updateAppointment(appointment.id, { checked_in: !appointment.checkedIn }),
+    mutationFn: () => updateAppointment(appointment.id, {
+      checked_in: !appointment.checkedIn,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-appointments']);
       toast.success('Check-in status updated!');
@@ -60,19 +57,21 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
   });
 
   const onCancelClick = () => {
-    if (!window.confirm('Cancel this appointment?')) return;
+    const yes = window.confirm('Cancel this appointment?');
+    if (!yes) return;
     handleCancel();
   };
 
   const onCompleteClick = () => {
-    if (!window.confirm('Mark as completed?')) return;
+    const yes = window.confirm('Mark as completed?');
+    if (!yes) return;
     handleComplete();
   };
 
   const onCheckInClick = () => {
     const msg = appointment.checkedIn
-      ? 'Uncheck-in the patient (Mark as not arrived)?'
-      : 'Check-in the patient (Mark as arrived)?';
+      ? 'Un-check this patient? (Mark as not arrived?)'
+      : 'Check in the patient (Mark as arrived)?';
     if (!window.confirm(msg)) return;
     handleCheckInToggle();
   };
@@ -81,7 +80,35 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
   try {
     const dt = new Date(appointment.appointmentTime);
     startTime = format(dt, 'MMMM d, yyyy • h:mm a');
-  } catch {}
+  } catch {
+    /* no-op */
+  }
+
+  // Map statuses to color classes
+  const statusColors: Record<string, string> = {
+    scheduled: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+  };
+
+  // Status badge
+  const statusBadge = (
+    <span
+      className={
+        `px-2 py-1 text-xs rounded-full font-medium ` +
+        (statusColors[appointment.status] ?? 'bg-gray-100 text-gray-800')
+      }
+    >
+      {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+    </span>
+  );
+
+  // “Checked In” badge (if arrived)
+  const arrivedBadge = appointment.checkedIn && (
+    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 text-xs rounded-full font-medium">
+      Arrived
+    </span>
+  );
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-4">
@@ -91,14 +118,8 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           {appointment.appointmentType?.name || 'Appointment'}
         </h3>
         <div className="flex items-center space-x-2">
-          {appointment.checkedIn && (
-            <span className="bg-green-100 text-green-800 px-2 py-1 text-xs rounded-full">
-              Arrived
-            </span>
-          )}
-          <span className="bg-blue-100 text-blue-800 px-2 py-1 text-xs rounded-full">
-            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-          </span>
+          {arrivedBadge}
+          {statusBadge}
         </div>
       </div>
 
@@ -111,15 +132,14 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           </p>
         )}
         {appointment.dentist && (
-          <p className="mb-1">
-            Dentist: Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}
-          </p>
+          <p className="mb-1">Dentist: Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}</p>
         )}
         <p>{startTime}</p>
       </div>
 
-      {/* Buttons */}
+      {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Check In / Un-check In */}
         {appointment.status === 'scheduled' && (
           <Button
             variant="warning"
@@ -127,10 +147,11 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
             isLoading={isToggling}
           >
             <Check className="w-4 h-4 mr-1" />
-            {appointment.checkedIn ? 'Un-Check In' : 'Check In'}
+            {appointment.checkedIn ? 'Un-Check' : 'Check In'}
           </Button>
         )}
 
+        {/* Reschedule => open modal */}
         {appointment.status === 'scheduled' && (
           <Button variant="outline" onClick={() => setShowEditModal(true)}>
             <Edit2 className="w-4 h-4 mr-1" />
@@ -138,6 +159,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           </Button>
         )}
 
+        {/* Cancel */}
         {appointment.status === 'scheduled' && (
           <Button variant="danger" onClick={onCancelClick}>
             <X className="w-4 h-4 mr-1" />
@@ -145,6 +167,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
           </Button>
         )}
 
+        {/* Complete */}
         {appointment.status === 'scheduled' && (
           <Button variant="success" onClick={onCompleteClick}>
             <CheckCircle className="w-4 h-4 mr-1" />
@@ -153,7 +176,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
         )}
       </div>
 
-      {/* Edit/Reschedule Modal */}
+      {/* Edit Appointment Modal */}
       {showEditModal && (
         <AdminAppointmentModal
           isOpen={showEditModal}
