@@ -1,14 +1,14 @@
 // File: /src/pages/Admin/Dashboard/AppointmentsList.tsx
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { api } from '../../../lib/api'; // or your fetchAppointments fn
 import Button from '../../../components/UI/Button';
 import AdminAppointmentCard from './AdminAppointmentCard';
 import AdminAppointmentModal from './AdminAppointmentModal';
-import type { Appointment } from '../../../types';
+// Import your API helpers
+import { api, getDentists } from '../../../lib/api'; 
+import type { Appointment, Dentist } from '../../../types';
 
-// If your backend returns a paginated shape
 interface PaginatedAppointments {
   appointments: Appointment[];
   meta: {
@@ -19,31 +19,41 @@ interface PaginatedAppointments {
   };
 }
 
-// Helper to fetch appointments w/ pagination & filters
-async function fetchAppointments({
-  page,
-  status,
-  searchTerm,
-  dentistName,
-  date,
-}: {
-  page: number;
-  status: string;
-  searchTerm: string;
-  dentistName: string;
-  date: string;
-}) {
-  const response = await api.get('/appointments', {
-    params: {
-      page,
-      per_page: 10,
-      status,
-      q: searchTerm,
-      dentist_name: dentistName,
-      date,
-    },
-  });
-  return response.data as PaginatedAppointments;
+/**
+ * We fetch appointments with optional filters:
+ *  - page
+ *  - status (scheduled, completed, etc.)
+ *  - q (search query: can match name, email, or ID)
+ *  - dentist_id
+ *  - date (YYYY-MM-DD)
+ */
+async function fetchAppointments(
+  page: number,
+  status: string,
+  q: string,
+  dentistId: string,
+  date: string
+): Promise<PaginatedAppointments> {
+  // Build the params object
+  const params: any = {
+    page,
+    per_page: 10,
+  };
+
+  // Only include status if non-empty
+  if (status) params.status = status;
+
+  // If dentistId is not empty => pass it
+  if (dentistId) params.dentist_id = dentistId;
+
+  // If date => pass it
+  if (date) params.date = date;
+
+  // If q => pass it as all-lowercase
+  if (q.trim()) params.q = q.toLowerCase();
+
+  const response = await api.get('/appointments', { params });
+  return response.data;
 }
 
 export default function AppointmentsList() {
@@ -52,21 +62,45 @@ export default function AppointmentsList() {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [dentistName, setDentistName] = useState('');
-  const [date, setDate] = useState('');
+  // We'll store the *debounced* searchTerm so we only re-query after a short delay
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  // Default to "scheduled"
+  const [selectedDentistId, setSelectedDentistId] = useState(''); // empty => all
+  const [date, setDate] = useState('');
   const [status, setStatus] = useState('scheduled');
 
   // Create-Appointment modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Scroll to top on page change
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [page]);
+  // ----------------------------------------------------------------
+  // 1) Dentist list for the dropdown
+  // ----------------------------------------------------------------
+  const {
+    data: dentistList,
+    isLoading: isDentistLoading,
+    error: dentistError,
+  } = useQuery<Dentist[]>({
+    queryKey: ['all-dentists'], // or any key
+    queryFn: async () => {
+      const res = await getDentists();
+      return res.data; // array of Dentist
+    },
+  });
 
-  // Query for appointments (admin sees all, with optional filters)
+  // ----------------------------------------------------------------
+  // 2) Debounce logic for searchTerm
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // ----------------------------------------------------------------
+  // 3) Query for the appointments
+  // ----------------------------------------------------------------
   const {
     data,
     isLoading,
@@ -74,12 +108,20 @@ export default function AppointmentsList() {
     error,
     isFetching,
   } = useQuery<PaginatedAppointments>({
-    queryKey: ['admin-appointments', page, status, searchTerm, dentistName, date],
+    queryKey: [
+      'admin-appointments',
+      page,
+      status,
+      debouncedSearchTerm,
+      selectedDentistId,
+      date,
+    ],
     queryFn: () =>
-      fetchAppointments({ page, status, searchTerm, dentistName, date }),
+      fetchAppointments(page, status, debouncedSearchTerm, selectedDentistId, date),
     keepPreviousData: true,
   });
 
+  // If no data yet, handle loading / error states
   if (isLoading) {
     return (
       <div className="text-center py-12">
@@ -87,7 +129,6 @@ export default function AppointmentsList() {
       </div>
     );
   }
-
   if (isError) {
     return (
       <div className="text-center py-12 text-red-600">
@@ -96,19 +137,30 @@ export default function AppointmentsList() {
     );
   }
 
-  if (!data) return null;
+  // De-structure the returned object
+  const { appointments, meta } = data || { appointments: [], meta: {} };
 
-  const { appointments, meta } = data;
+  // ----------------------------------------------------------------
+  // 4) Clear filters
+  // ----------------------------------------------------------------
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setSelectedDentistId('');
+    setDate('');
+    setStatus('scheduled');
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* 1) FILTERS IN A CARD */}
+      {/* Filters Card */}
       <div className="bg-white p-6 rounded-md shadow-md space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search (Name, Email, ID)
+              Search
             </label>
             <input
               type="text"
@@ -119,29 +171,34 @@ export default function AppointmentsList() {
               }}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder='e.g. "Jane", "user@example.com", "15"'
+              placeholder='Name, Email, or ID'
             />
           </div>
 
-          {/* Dentist name */}
+          {/* Dentist dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Dentist
             </label>
-            <input
-              type="text"
-              value={dentistName}
+            <select
+              value={selectedDentistId}
               onChange={(e) => {
-                setDentistName(e.target.value);
+                setSelectedDentistId(e.target.value);
                 setPage(1);
               }}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none
                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder='e.g. "Mary Smith"'
-            />
+            >
+              <option value="">All Dentists</option>
+              {!isDentistLoading && dentistList?.map((dentist) => (
+                <option key={dentist.id} value={String(dentist.id)}>
+                  Dr. {dentist.firstName} {dentist.lastName}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Date */}
+          {/* Date filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Date (YYYY-MM-DD)
@@ -180,9 +237,16 @@ export default function AppointmentsList() {
             </select>
           </div>
         </div>
+
+        {/* Clear Filters Button */}
+        <div className="text-right">
+          <Button variant="outline" onClick={handleClearFilters}>
+            Clear Filters
+          </Button>
+        </div>
       </div>
 
-      {/* 2) "NEW APPOINTMENT" BUTTON */}
+      {/* Create New Appointment */}
       <div className="text-right">
         <Button
           variant="primary"
@@ -194,22 +258,20 @@ export default function AppointmentsList() {
         </Button>
       </div>
 
-      {/* 3) APPOINTMENT RESULTS (AS CARDS) */}
+      {/* Appointments List */}
       <div className="bg-white p-6 rounded-md shadow-md">
-        {appointments.length > 0 ? (
+        {appointments && appointments.length > 0 ? (
           <div className="space-y-4">
             {appointments.map((appt) => (
               <AdminAppointmentCard key={appt.id} appointment={appt} />
             ))}
           </div>
         ) : (
-          <p className="text-center text-gray-500">
-            No matching appointments found.
-          </p>
+          <p className="text-center text-gray-500">No matching appointments found.</p>
         )}
       </div>
 
-      {/* 4) PAGINATION CONTROLS */}
+      {/* Pagination */}
       <div className="flex justify-center items-center mt-6 space-x-4">
         <button
           onClick={() => setPage((old) => Math.max(old - 1, 1))}
@@ -242,11 +304,11 @@ export default function AppointmentsList() {
         </div>
       )}
 
-      {/* 5) CREATE / EDIT APPOINTMENT MODAL */}
+      {/* Create / Edit Appointment Modal */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        editingAppointment={null}  // null => "create" mode
+        editingAppointment={null} // null => create mode
       />
     </div>
   );
