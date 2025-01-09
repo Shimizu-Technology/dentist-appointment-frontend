@@ -1,4 +1,5 @@
 // File: /src/pages/Admin/Dashboard/UsersList.tsx
+
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchUsers, getUsers } from '../../../lib/api';
@@ -32,27 +33,23 @@ export default function UsersList() {
   // **Ref** for the search input (to keep focus)
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Track if user wants the search input to remain focused
+  // Keep track if we want the search field to remain focused
   const [isSearchFocused, setIsSearchFocused] = useState(true);
 
-  // On every render, if we want it focused => do so
+  // Focus the search input if desired
   useEffect(() => {
     if (isSearchFocused) {
       searchRef.current?.focus();
     }
   });
 
-  // onChange => user typed => keep focusing
+  // Handle search changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPage(1);
     setSearchTerm(e.target.value);
     setIsSearchFocused(true);
   };
-
-  // If user physically focuses the field
   const handleSearchFocus = () => setIsSearchFocused(true);
-
-  // If user physically clicks away
   const handleSearchBlur = () => setIsSearchFocused(false);
 
   // Debounce effect
@@ -63,7 +60,7 @@ export default function UsersList() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Query the user list
+  // Query the user list (filtered by name/email if `debouncedTerm`)
   const {
     data,
     isLoading,
@@ -101,6 +98,7 @@ export default function UsersList() {
   if (!data) {
     return <div className="text-center py-12">No user data found.</div>;
   }
+
   const { users, meta } = data;
 
   // Create new user
@@ -115,7 +113,7 @@ export default function UsersList() {
     setIsModalOpen(true);
   }
 
-  // Clear search => re-focus
+  // Clear search
   function handleClearSearch() {
     setSearchTerm('');
     setDebouncedTerm('');
@@ -159,25 +157,30 @@ export default function UsersList() {
         </Button>
       </div>
 
-      {/* USER LIST */}
+      {/* USER LIST - now styled as “cards” */}
       <div className="space-y-4">
         {users.map((u) => (
           <div
             key={u.id}
             onClick={() => openEditModal(u)}
-            className="border rounded-md p-4 flex items-center justify-between
-                       hover:shadow-sm transition-shadow cursor-pointer"
+            className="block bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
           >
-            <div>
-              <p className="font-medium text-gray-900">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {u.firstName} {u.lastName}
-                {u.email ? ` (${u.email})` : ''}
-              </p>
-              <p className="text-sm text-gray-500">Role: {u.role}</p>
-              {u.phone && (
-                <p className="text-sm text-gray-500">Phone: {u.phone}</p>
-              )}
+              </h3>
+              {/* A small badge for role */}
+              <span className="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                {u.role}
+              </span>
             </div>
+
+            {u.email && (
+              <p className="text-gray-600 text-sm mb-1">{u.email}</p>
+            )}
+            {u.phone && (
+              <p className="text-gray-500 text-sm mb-1">{u.phone}</p>
+            )}
           </div>
         ))}
       </div>
