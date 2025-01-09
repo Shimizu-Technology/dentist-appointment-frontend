@@ -1,10 +1,10 @@
 // File: /src/pages/Appointments/New/NewAppointmentForm.tsx
 
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createAppointment, updateAppointment } from '../../../lib/api';
-import { getDependents } from '../../../lib/api';
+import { createAppointment, updateAppointment, getDependents } from '../../../lib/api';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
@@ -18,7 +18,7 @@ import TimeSlotPicker from './components/TimeSlotPicker';
 import type { Dependent, Appointment } from '../../../types';
 
 interface AppointmentFormData {
-  who: string;  // "self" or a dependent ID
+  who: string; // "self" or a dependent ID
   dentist_id: string;
   appointment_type_id: string;
   appointment_date: string;
@@ -91,8 +91,21 @@ export default function NewAppointmentForm({
 
   const {
     handleSubmit,
+    register,
     formState: { isSubmitting, isValid },
   } = methods;
+
+  // Enforce required date/time
+  // We’ll register hidden inputs so the form must have appointment_date/time
+  // or it won’t pass validation.
+  useEffect(() => {
+    register('appointment_date', {
+      required: 'Please pick an appointment date',
+    });
+    register('appointment_time', {
+      required: 'Please pick an appointment time',
+    });
+  }, [register]);
 
   // 3) Single mutation for create or update
   const { mutateAsync } = useMutation({
@@ -112,8 +125,6 @@ export default function NewAppointmentForm({
         appointment_type_id: Number(data.appointment_type_id),
         notes: data.notes || '',
         ...(dependentId ? { dependent_id: dependentId } : {}),
-        // If you want an explicit user_id for admin to pick themself, do:
-        // user_id: someValue
       };
 
       if (appointment) {
@@ -156,9 +167,7 @@ export default function NewAppointmentForm({
     return <p className="text-gray-500">Loading dependents...</p>;
   }
 
-  const formTitle = appointment
-    ? 'Save Changes'
-    : 'Book Appointment';
+  const formTitle = appointment ? 'Save Changes' : 'Book Appointment';
 
   return (
     <FormProvider {...methods}>
@@ -167,7 +176,7 @@ export default function NewAppointmentForm({
           {/* Who is this appt for: “Myself” or dependent */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Who is this appointment for?
+              Who is this appointment for?<span className="text-red-500 ml-1">*</span>
             </label>
             <select
               {...methods.register('who')}

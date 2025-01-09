@@ -18,10 +18,9 @@ export default function AppointmentTypeSelect() {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        Appointment Type
+        Appointment Type <span className="text-red-500 ml-1">*</span>
       </label>
       <select
-        // Instead of props.register, we do:
         {...register('appointment_type_id', {
           required: 'Please select an appointment type',
         })}
@@ -35,7 +34,6 @@ export default function AppointmentTypeSelect() {
         ))}
       </select>
 
-      {/* If you want to show error: */}
       {errors.appointment_type_id && (
         <p className="mt-1 text-sm text-red-600">
           {errors.appointment_type_id.message as string}

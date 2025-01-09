@@ -1,5 +1,4 @@
 // File: /src/pages/Profile/DependentModal.tsx
-
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { X } from 'lucide-react';
@@ -8,47 +7,39 @@ import Input from '../../components/UI/Input';
 import { Dependent } from '../../types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createDependent, updateDependent } from '../../lib/api';
-import toast from 'react-hot-toast'; // <-- Import toast
+import toast from 'react-hot-toast';
 
 interface DependentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dependent: Dependent | null; // null => "create" mode, otherwise => "edit" mode
+  dependent: Dependent | null;
 }
 
-/** The form data we expect. Note dateOfBirth is a *string* in "YYYY-MM-DD". */
 interface FormData {
   firstName: string;
   lastName: string;
-  dateOfBirth: string; // e.g. "2000-01-02"
+  dateOfBirth: string;
 }
 
 export default function DependentModal({ isOpen, onClose, dependent }: DependentModalProps) {
   const queryClient = useQueryClient();
 
-  // Setup react-hook-form
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting, isValid },
-  } = useForm<FormData>({
-    mode: 'onChange',
-  });
+  } = useForm<FormData>({ mode: 'onChange' });
 
-  // On modal open or if `dependent` changes, set default form values:
   useEffect(() => {
     if (!isOpen) return;
-
     if (dependent) {
-      // Editing existing => fill the form with the existing dependent data
       reset({
         firstName: dependent.firstName,
         lastName: dependent.lastName,
         dateOfBirth: dependent.dateOfBirth || '',
       });
     } else {
-      // Creating a new dependent => blank form
       reset({
         firstName: '',
         lastName: '',
@@ -57,19 +48,16 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
     }
   }, [isOpen, dependent, reset]);
 
-  // Create or update dependent
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       if (dependent) {
-        // Updating existing dependent
         return updateDependent(dependent.id, data);
       } else {
-        // Creating a brand new dependent
         return createDependent(data);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['dependents']); // Refresh the list
+      queryClient.invalidateQueries(['dependents']);
       toast.success(dependent ? 'Dependent updated!' : 'Dependent added!');
       onClose();
     },
@@ -87,7 +75,6 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-        {/* Header */}
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-900">
             {dependent ? 'Edit' : 'Add'} Dependent
@@ -97,28 +84,27 @@ export default function DependentModal({ isOpen, onClose, dependent }: Dependent
           </button>
         </div>
 
-        {/* Body (Form) */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <Input
             label="First Name"
+            required
             {...register('firstName', { required: 'First name is required' })}
             error={errors.firstName?.message}
           />
-
           <Input
             label="Last Name"
+            required
             {...register('lastName', { required: 'Last name is required' })}
             error={errors.lastName?.message}
           />
-
           <Input
-            type="date"
             label="Date of Birth"
+            type="date"
+            required
             {...register('dateOfBirth', { required: 'Date of birth is required' })}
             error={errors.dateOfBirth?.message}
           />
 
-          {/* Footer */}
           <div className="flex justify-end space-x-4 pt-4">
             <Button
               type="button"

@@ -18,7 +18,7 @@ export default function DentistSelect() {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        Select Dentist
+        Select Dentist <span className="text-red-500 ml-1">*</span>
       </label>
       <select
         {...register('dentist_id', { required: 'Please select a dentist' })}

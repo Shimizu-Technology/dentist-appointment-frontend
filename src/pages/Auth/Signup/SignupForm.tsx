@@ -1,3 +1,4 @@
+// File: /src/pages/Auth/Signup/SignupForm.tsx
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import Button from '../../../components/UI/Button';
@@ -10,7 +11,7 @@ interface SignupFormData {
   confirmPassword: string;
   firstName: string;
   lastName: string;
-  phone: string; // NEW
+  phone: string;
 }
 
 export default function SignupForm() {
@@ -21,12 +22,10 @@ export default function SignupForm() {
     watch,
     setError,
     formState: { errors, isSubmitting, isValid },
-  } = useForm<SignupFormData>({
-    mode: 'onChange', // validate on every change
-  });
+  } = useForm<SignupFormData>({ mode: 'onChange' });
 
   const onSubmit = async (data: SignupFormData) => {
-    // Pass phone as the 5th argument
+    // Attempt signup
     const result = await signup(
       data.email,
       data.password,
@@ -45,11 +44,13 @@ export default function SignupForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="First Name"
+          required
           {...register('firstName', { required: 'First name is required' })}
           error={errors.firstName?.message}
         />
         <Input
           label="Last Name"
+          required
           {...register('lastName', { required: 'Last name is required' })}
           error={errors.lastName?.message}
         />
@@ -58,6 +59,7 @@ export default function SignupForm() {
       <Input
         label="Email"
         type="email"
+        required
         {...register('email', {
           required: 'Email is required',
           pattern: {
@@ -71,6 +73,7 @@ export default function SignupForm() {
       <Input
         label="Password"
         type="password"
+        required
         {...register('password', {
           required: 'Password is required',
           minLength: {
@@ -84,6 +87,7 @@ export default function SignupForm() {
       <Input
         label="Confirm Password"
         type="password"
+        required
         {...register('confirmPassword', {
           required: 'Please confirm your password',
           validate: (value) =>
@@ -92,11 +96,11 @@ export default function SignupForm() {
         error={errors.confirmPassword?.message}
       />
 
-      {/* NEW: Phone Number field */}
       <Input
         label="Phone Number"
         type="tel"
         placeholder="(555) 123-4567"
+        required
         {...register('phone', {
           required: 'Phone number is required',
           pattern: {

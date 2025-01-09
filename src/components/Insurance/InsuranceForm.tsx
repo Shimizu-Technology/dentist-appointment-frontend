@@ -1,10 +1,9 @@
 // File: /src/components/Insurance/InsuranceForm.tsx
-
 import { useForm } from 'react-hook-form';
 import { useInsurance } from '../../hooks/useInsurance';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
-import toast from 'react-hot-toast'; // Optional if you want direct toasts here
+import toast from 'react-hot-toast';
 
 interface InsuranceFormData {
   providerName: string;
@@ -36,11 +35,9 @@ export default function InsuranceForm({ currentInfo, onSuccess }: InsuranceFormP
   const onSubmit = async (data: InsuranceFormData) => {
     updateInsurance(data, {
       onSuccess: () => {
-        // e.g. toast.success('Insurance updated!'); if you want
         onSuccess?.();
       },
       onError: (error: any) => {
-        // If the hook had an onError, you can do toast.error(...) here
         toast.error(`Failed to update insurance: ${error.message}`);
       },
     });
@@ -50,18 +47,21 @@ export default function InsuranceForm({ currentInfo, onSuccess }: InsuranceFormP
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Input
         label="Insurance Provider"
+        required
         {...register('providerName', { required: 'Provider name is required' })}
         error={errors.providerName?.message}
       />
 
       <Input
         label="Policy Number"
+        required
         {...register('policyNumber', { required: 'Policy number is required' })}
         error={errors.policyNumber?.message}
       />
 
       <Input
         label="Plan Type"
+        required
         {...register('planType', { required: 'Plan type is required' })}
         placeholder="e.g., PPO, HMO"
         error={errors.planType?.message}

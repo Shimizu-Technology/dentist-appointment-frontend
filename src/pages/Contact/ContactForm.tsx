@@ -1,3 +1,4 @@
+// File: /src/pages/Contact/ContactForm.tsx
 import { useForm } from 'react-hook-form';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -26,9 +27,11 @@ export default function ContactForm() {
   return (
     <div className="bg-white p-8 rounded-lg shadow-md">
       <h2 className="text-2xl font-semibold text-gray-900 mb-6">Send us a Message</h2>
+      
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Input
           label="Full Name"
+          required
           {...register('name', { required: 'Name is required' })}
           error={errors.name?.message}
         />
@@ -36,10 +39,11 @@ export default function ContactForm() {
         <Input
           label="Email"
           type="email"
+          required
           {...register('email', {
             required: 'Email is required',
             pattern: {
-              value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+              value: /^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$/i,
               message: 'Invalid email address',
             },
           })}
@@ -49,6 +53,7 @@ export default function ContactForm() {
         <Input
           label="Phone"
           type="tel"
+          required
           {...register('phone', {
             required: 'Phone number is required',
             pattern: {
@@ -59,9 +64,10 @@ export default function ContactForm() {
           error={errors.phone?.message}
         />
 
+        {/* For textarea, we don’t have a custom <Input>—just do the asterisk manually */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Message
+            Message <span className="text-red-500 ml-1">*</span>
           </label>
           <textarea
             {...register('message', { required: 'Message is required' })}

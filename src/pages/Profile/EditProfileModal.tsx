@@ -1,5 +1,4 @@
 // File: /src/pages/Profile/EditProfileModal.tsx
-
 import { X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import Button from '../../components/UI/Button';
@@ -50,7 +49,6 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       return updateCurrentUser(payload);
     },
     onSuccess: (response) => {
-      // Updated user object from the server
       const updatedUser = response.data;
       setAuth(updatedUser, localStorage.getItem('token') || '');
       queryClient.invalidateQueries(['user']);
@@ -83,58 +81,47 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
         {/* Form Body */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-          {/* Name Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="First Name"
-              {...register('firstName', {
-                required: 'First name is required',
-              })}
+              required
+              {...register('firstName', { required: 'First name is required' })}
               error={errors.firstName?.message}
             />
-
             <Input
               label="Last Name"
-              {...register('lastName', {
-                required: 'Last name is required',
-              })}
+              required
+              {...register('lastName', { required: 'Last name is required' })}
               error={errors.lastName?.message}
             />
           </div>
 
-          {/* Contact Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Email"
-              type="email"
-              {...register('email', {
-                required: 'Email is required',
-                pattern: {
-                  value: /^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$/i,
-                  message: 'Invalid email address',
-                },
-              })}
-              error={errors.email?.message}
-            />
+          <Input
+            label="Email"
+            type="email"
+            required
+            {...register('email', {
+              required: 'Email is required',
+              pattern: {
+                value: /^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$/i,
+                message: 'Invalid email address',
+              },
+            })}
+            error={errors.email?.message}
+          />
 
-            <Input
-              label="Phone"
-              type="tel"
-              {...register('phone', {
-                pattern: {
-                  value: /^\+?[\d\s-]+$/,
-                  message: 'Invalid phone number',
-                },
-              })}
-              error={errors.phone?.message}
-            />
-          </div>
+          <Input
+            label="Phone"
+            type="tel"
+            {...register('phone', {
+              pattern: {
+                value: /^\+?[\d\s-]+$/,
+                message: 'Invalid phone number',
+              },
+            })}
+            error={errors.phone?.message}
+          />
 
-          <p className="text-sm text-gray-500">
-            We only use your phone number to confirm appointments or notify you of changes.
-          </p>
-
-          {/* Form Footer */}
           <div className="flex justify-end space-x-4 pt-4">
             <Button
               type="button"

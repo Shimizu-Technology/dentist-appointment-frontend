@@ -69,8 +69,21 @@ export default function AdminAppointmentModal({
     handleSubmit,
     reset,
     register,
-    formState: { isSubmitting, isValid },
+    formState: { isSubmitting, isValid, errors },
   } = methods;
+
+  // Enforce required fields
+  useEffect(() => {
+    register('user_id', {
+      required: !isEditing ? 'Please select a user' : false,
+    });
+    register('appointment_date', {
+      required: 'Please pick an appointment date',
+    });
+    register('appointment_time', {
+      required: 'Please pick an appointment time slot',
+    });
+  }, [register, isEditing]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,7 +94,7 @@ export default function AdminAppointmentModal({
       const timeStr = dt.toTimeString().slice(0, 5);
 
       reset({
-        user_id: '',
+        user_id: '', // not used for existing appointments
         dentist_id: String(editingAppointment.dentistId),
         appointment_type_id: String(editingAppointment.appointmentTypeId),
         appointment_date: dateStr,
@@ -101,7 +114,6 @@ export default function AdminAppointmentModal({
         appointment_date: baseDateStr,
         appointment_time: '',
         notes: '',
-        // For newly created appts, we default to false if you prefer:
         checked_in: false,
       });
       setSelectedUserId(null);
@@ -117,9 +129,9 @@ export default function AdminAppointmentModal({
         dentist_id: parseInt(data.dentist_id, 10),
         appointment_type_id: parseInt(data.appointment_type_id, 10),
         notes: data.notes,
-        // <--- We'll attach checked_in if we want:
         checked_in: !!data.checked_in,
       };
+
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
       }
@@ -204,11 +216,11 @@ export default function AdminAppointmentModal({
 
         <FormProvider {...methods}>
           <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-            {/* If new, pick user */}
+            {/* If new, pick user (required) */}
             {!isEditing && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select User
+                  Select User <span className="text-red-500">*</span>
                 </label>
                 <UserSearchSelect
                   onSelectUser={(uid) => {
@@ -216,6 +228,11 @@ export default function AdminAppointmentModal({
                     setSelectedUserId(String(uid));
                   }}
                 />
+                {errors.user_id && (
+                  <p className="text-red-600 text-sm mt-1">
+                    {String(errors.user_id.message)}
+                  </p>
+                )}
               </div>
             )}
 
@@ -226,6 +243,18 @@ export default function AdminAppointmentModal({
               <DatePicker />
               <TimeSlotPicker editingAppointmentId={editingAppointment?.id} />
             </div>
+
+            {/* Show errors for date/time if missing */}
+            {errors.appointment_date && (
+              <p className="text-red-600 text-sm">
+                {String(errors.appointment_date.message)}
+              </p>
+            )}
+            {errors.appointment_time && (
+              <p className="text-red-600 text-sm">
+                {String(errors.appointment_time.message)}
+              </p>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -238,7 +267,7 @@ export default function AdminAppointmentModal({
               />
             </div>
 
-            {/* Only show check-in toggle if editing (but you can remove the condition if you want it on create) */}
+            {/* Only show check-in toggle if editing */}
             {isEditing && (
               <div className="flex items-center space-x-2">
                 <input

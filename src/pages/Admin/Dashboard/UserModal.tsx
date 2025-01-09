@@ -17,12 +17,8 @@ interface UserModalProps {
 }
 
 /**
- * Admin can create or update a user. 
- * Password is *not* set by the admin. Instead, the user will get an invitation link from the backend if email is present.
- * 
- * - phone is required for all roles
- * - email is optional if phone_only
- * - if role != phone_only, email *should* be provided (they’ll get an invite)
+ * Admin can create or update a user.
+ * Now email and role must be required fields.
  */
 export default function UserModal({
   isOpen,
@@ -48,7 +44,6 @@ export default function UserModal({
       setLastName(existingUser.lastName);
       setPhone(existingUser.phone || '');
       setEmail(existingUser.email || '');
-      // If user.role is something else, cast it as needed:
       setRole(existingUser.role as 'user' | 'admin' | 'phone_only');
     } else {
       // Creating new => blank out
@@ -59,11 +54,6 @@ export default function UserModal({
       setRole('user');
     }
   }, [isOpen, existingUser]);
-
-  // For dynamic form:
-  // phone is always required  
-  // if role === 'phone_only', email is optional
-  // if role !== 'phone_only', we do strongly encourage an email
 
   async function handleSave() {
     // Validate form
@@ -79,10 +69,13 @@ export default function UserModal({
       toast.error('Phone number is required.');
       return;
     }
-
-    // If user is NOT phone_only but no email given => show error
-    if (role !== 'phone_only' && !email.trim()) {
-      toast.error('Email is required for normal or admin user.');
+    // As requested: Always require email and role (even if phone_only).
+    if (!email.trim()) {
+      toast.error('Email is required.');
+      return;
+    }
+    if (!role) {
+      toast.error('Role is required.');
       return;
     }
 
@@ -93,19 +86,18 @@ export default function UserModal({
           firstName,
           lastName,
           phone,
-          email: email.trim() || undefined,
+          email: email.trim(),
           role,
         });
         toast.success('User updated!');
-
       } else {
         // Create new
         await createUser({
           firstName,
           lastName,
           phone,
-          email: email.trim() || undefined,
-          // NO password => back end sends invite link if email is present
+          email: email.trim(),
+          // no password => the backend sends invite link if email is present
           role,
         });
         toast.success('User created! (Invitation email sent if email was provided.)');
@@ -114,7 +106,6 @@ export default function UserModal({
       queryClient.invalidateQueries(['users']);
       afterSave?.();
       onClose();
-
     } catch (err: any) {
       const msg = err?.response?.data?.errors?.join(', ') || err.message;
       toast.error(`Failed to save user: ${msg}`);
@@ -197,21 +188,22 @@ export default function UserModal({
             required
           />
 
-          {/** If role != phone_only, we want an email. */}
-          {role !== 'phone_only' && (
-            <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="(required for normal or admin users)"
-            />
-          )}
+          {/*
+            As per your new requirement:
+            "As an admin, the 'Edit User' modal should have the email and role be required as well"
+            We'll always show email with required
+          */}
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-          {/** Role dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role
+              Role <span className="text-red-500">*</span>
             </label>
             <select
               className="border w-full rounded-md px-3 py-2"
@@ -219,6 +211,7 @@ export default function UserModal({
               onChange={(e) =>
                 setRole(e.target.value as 'user' | 'admin' | 'phone_only')
               }
+              required
             >
               <option value="user">Regular User</option>
               <option value="admin">Admin</option>

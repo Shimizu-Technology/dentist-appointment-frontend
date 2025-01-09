@@ -1,3 +1,4 @@
+// File: /src/pages/Auth/Login/LoginForm.tsx
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import Button from '../../../components/UI/Button';
@@ -16,9 +17,7 @@ export default function LoginForm() {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting, isValid },
-  } = useForm<LoginFormData>({
-    mode: 'onChange',
-  });
+  } = useForm<LoginFormData>({ mode: 'onChange' });
 
   const onSubmit = async (data: LoginFormData) => {
     const result = await login(data.email, data.password);
@@ -32,10 +31,11 @@ export default function LoginForm() {
       <Input
         label="Email"
         type="email"
+        required
         {...register('email', {
           required: 'Email is required',
           pattern: {
-            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+            value: /^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$/i,
             message: 'Invalid email address',
           },
         })}
@@ -45,6 +45,7 @@ export default function LoginForm() {
       <Input
         label="Password"
         type="password"
+        required
         {...register('password', {
           required: 'Password is required',
           minLength: {
