@@ -5,10 +5,10 @@ import { Plus } from 'lucide-react';
 import Button from '../../../components/UI/Button';
 import AdminAppointmentCard from './AdminAppointmentCard';
 import AdminAppointmentModal from './AdminAppointmentModal';
-import { api, getDentists } from '../../../lib/api'; // your API helpers
+import { api, getDentists } from '../../../lib/api';
+import PaginationControls from '../../../components/UI/PaginationControls';
 import type { Appointment, Dentist } from '../../../types';
 
-// Shape of the paginated response
 interface PaginatedAppointments {
   appointments: Appointment[];
   meta: {
@@ -23,7 +23,7 @@ interface PaginatedAppointments {
  * Fetch appointments with optional filters:
  * - page
  * - status
- * - q (search query: forced to lowercase)
+ * - q (search query)
  * - dentist_id
  * - date (YYYY-MM-DD)
  */
@@ -34,10 +34,7 @@ async function fetchAppointments(
   dentistId: string,
   date: string
 ): Promise<PaginatedAppointments> {
-  const params: any = {
-    page,
-    per_page: 10,
-  };
+  const params: any = { page, per_page: 10 };
   if (status)    params.status     = status;
   if (dentistId) params.dentist_id = dentistId;
   if (date)      params.date       = date;
@@ -48,66 +45,39 @@ async function fetchAppointments(
 }
 
 export default function AppointmentsList() {
-  // ------------------------------------
-  // PAGINATION & FILTER STATES
-  // ------------------------------------
+  // PAGINATION & FILTERS
   const [page, setPage] = useState(1);
 
-  // Search
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  // Dentist dropdown
   const [selectedDentistId, setSelectedDentistId] = useState('');
-
-  // Date filter
   const [date, setDate] = useState('');
-
-  // Status (scheduled, completed, etc.)
   const [status, setStatus] = useState('scheduled');
 
-  // ------------------------------------
-  // MODAL: Create Appointment
-  // ------------------------------------
+  // Create Appointment Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // ------------------------------------
-  // SEARCH INPUT FOCUS HANDLING
-  // ------------------------------------
+  // For focusing the search input
   const searchRef = useRef<HTMLInputElement>(null);
-
-  // This boolean tracks whether the user is still "actively" in the search box
-  // or wants it re-focused after re-renders. We'll set it false onBlur.
   const [isSearchFocused, setIsSearchFocused] = useState(true);
 
-  // onChange => user typed => keep the search box focused
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     setSearchTerm(e.target.value);
     setPage(1);
-    // If the user typed, let’s keep focus
     setIsSearchFocused(true);
-  };
+  }
+  const handleSearchFocus = () => setIsSearchFocused(true);
+  const handleSearchBlur = () => setIsSearchFocused(false);
 
-  // onFocus => user is actively focusing the field
-  const handleSearchFocus = () => {
-    setIsSearchFocused(true);
-  };
-
-  // onBlur => user clicked away => do not auto-refocus
-  const handleSearchBlur = () => {
-    setIsSearchFocused(false);
-  };
-
-  // On every re-render, if we want to keep focus => do so
+  // Keep the search input focused if isSearchFocused is true
   useEffect(() => {
     if (isSearchFocused) {
       searchRef.current?.focus();
     }
   });
 
-  // ------------------------------------
-  // DEBOUNCE searchTerm => debouncedTerm
-  // ------------------------------------
+  // Debounce searchTerm => debouncedTerm
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedTerm(searchTerm);
@@ -115,24 +85,20 @@ export default function AppointmentsList() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // ------------------------------------
-  // FETCH DENTISTS (for the dropdown)
-  // ------------------------------------
+  // DENTISTS for the dropdown
   const {
-    data: dentistList,
+    data: dentistList = [],
     isLoading: isDentistLoading,
     error: dentistError,
   } = useQuery<Dentist[]>({
     queryKey: ['all-dentists'],
     queryFn: async () => {
       const res = await getDentists();
-      return res.data; // array of Dentist
+      return res.data;
     },
   });
 
-  // ------------------------------------
-  // FETCH APPOINTMENTS
-  // ------------------------------------
+  // Fetch Appointments
   const {
     data,
     isLoading,
@@ -168,28 +134,23 @@ export default function AppointmentsList() {
     );
   }
 
-  const { appointments, meta } = data || { appointments: [], meta: {} };
+  const { appointments = [], meta = { currentPage: 1, totalPages: 1 } } = data || {};
 
-  // ------------------------------------
-  // CLEAR FILTERS
-  // ------------------------------------
-  const handleClearFilters = () => {
+  // Clear filters
+  function handleClearFilters() {
     setSearchTerm('');
     setDebouncedTerm('');
     setSelectedDentistId('');
     setDate('');
     setStatus('scheduled');
     setPage(1);
-
-    // We want to re-focus the search bar after clearing
     setIsSearchFocused(true);
-  };
+  }
 
   return (
     <div className="space-y-6">
       {/* FILTERS */}
       <div className="bg-white p-6 rounded-md shadow-md space-y-4">
-        {/* Row of inputs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search input */}
           <div>
@@ -203,8 +164,7 @@ export default function AppointmentsList() {
               onChange={handleSearchChange}
               onFocus={handleSearchFocus}
               onBlur={handleSearchBlur}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Name, Email, or ID"
             />
           </div>
@@ -220,13 +180,12 @@ export default function AppointmentsList() {
                 setSelectedDentistId(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Dentists</option>
-              {!isDentistLoading && dentistList?.map((dentist) => (
-                <option key={dentist.id} value={String(dentist.id)}>
-                  Dr. {dentist.firstName} {dentist.lastName}
+              {!isDentistLoading && dentistList.map((d) => (
+                <option key={d.id} value={String(d.id)}>
+                  Dr. {d.firstName} {d.lastName}
                 </option>
               ))}
             </select>
@@ -244,8 +203,7 @@ export default function AppointmentsList() {
                 setDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -260,8 +218,7 @@ export default function AppointmentsList() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="scheduled">Scheduled</option>
               <option value="completed">Completed</option>
@@ -272,7 +229,6 @@ export default function AppointmentsList() {
           </div>
         </div>
 
-        {/* Clear filters button */}
         <div className="text-right">
           <Button variant="outline" onClick={handleClearFilters}>
             Clear Filters
@@ -280,7 +236,7 @@ export default function AppointmentsList() {
         </div>
       </div>
 
-      {/* New Appointment button */}
+      {/* NEW Appointment button */}
       <div className="text-right">
         <Button
           variant="primary"
@@ -294,7 +250,7 @@ export default function AppointmentsList() {
 
       {/* APPOINTMENTS LIST */}
       <div className="bg-white p-6 rounded-md shadow-md">
-        {appointments && appointments.length > 0 ? (
+        {appointments.length > 0 ? (
           <div className="space-y-4">
             {appointments.map((appt) => (
               <AdminAppointmentCard key={appt.id} appointment={appt} />
@@ -305,39 +261,22 @@ export default function AppointmentsList() {
         )}
       </div>
 
-      {/* PAGINATION */}
-      <div className="flex justify-center items-center mt-6 space-x-4">
-        <button
-          onClick={() => setPage((old) => Math.max(old - 1, 1))}
-          disabled={meta.currentPage === 1 || isFetching}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Previous
-        </button>
+      {/* PAGINATION CONTROLS (replaces old next/prev) */}
+      <PaginationControls
+        currentPage={meta.currentPage}
+        totalPages={meta.totalPages}
+        onPageChange={setPage}
+        showGoTo
+        smooth
+      />
 
-        <span className="text-gray-600">
-          Page {meta.currentPage} of {meta.totalPages}
-        </span>
-
-        <button
-          onClick={() => {
-            if (meta.currentPage < meta.totalPages) {
-              setPage((old) => old + 1);
-            }
-          }}
-          disabled={meta.currentPage === meta.totalPages || isFetching}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Next
-        </button>
-      </div>
       {isFetching && (
         <div className="text-center text-sm text-gray-500 mt-2">
           Loading...
         </div>
       )}
 
-      {/* Create/Edit Appointment Modal */}
+      {/* AdminAppointmentModal => create new */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
