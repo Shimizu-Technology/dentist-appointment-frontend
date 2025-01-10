@@ -242,7 +242,7 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
 }
 
 /**
- * For admin to create a new user (invitation-based or phone_only).
+ * For admin to create a new user (invitation-based, phone_only, or normal).
  * POST /users
  */
 export async function createUser(payload: {
@@ -251,16 +251,17 @@ export async function createUser(payload: {
   email?: string;
   phone?: string;
   password?: string;
-  role: 'user' | 'admin' | 'phone_only';
+  role?: 'user' | 'admin' | 'phone_only';
 }) {
   return api.post('/users', {
     user: {
       first_name: payload.firstName,
-      last_name: payload.lastName,
-      email: payload.email,
-      phone: payload.phone,
-      password: payload.password,
-      role: payload.role,
+      last_name:  payload.lastName,
+      email:      payload.email,
+      phone:      payload.phone,
+      password:   payload.password,
+      // Default role to 'user' if none was provided:
+      role:       payload.role || 'user',
     },
   });
 }
@@ -279,11 +280,11 @@ export async function updateUser(
   return api.patch(`/users/${userId}`, {
     user: {
       first_name: payload.firstName,
-      last_name: payload.lastName,
-      email: payload.email,
-      phone: payload.phone,
-      password: payload.password,
-      role: payload.role,
+      last_name:  payload.lastName,
+      email:      payload.email,
+      phone:      payload.phone,
+      password:   payload.password,
+      role:       payload.role,
     },
   });
 }
