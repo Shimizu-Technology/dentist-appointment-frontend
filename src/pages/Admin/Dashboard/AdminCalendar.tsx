@@ -35,7 +35,6 @@ interface PaginatedAppointments {
   };
 }
 
-/** The shape of your schedule response. Adjust if needed. */
 interface SchedulesResponse {
   clinicOpenTime: string;   // e.g. "09:00"
   clinicCloseTime: string;  // e.g. "17:00"
@@ -48,10 +47,10 @@ export default function AdminCalendar() {
   const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
-  // For filtering by dentist
+  // State for filtering by dentist
   const [selectedDentistId, setSelectedDentistId] = useState<string>('');
 
-  // For the “Go to date” feature
+  // “Go to date” feature
   const [searchDate, setSearchDate] = useState('');
 
   // For the appointment modal
@@ -59,7 +58,7 @@ export default function AdminCalendar() {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
-  // 1) FETCH Schedules data
+  // 1) Schedules data (open/close times, openDays, etc.)
   const { data: scheduleData } = useQuery<SchedulesResponse>({
     queryKey: ['schedule-data'],
     queryFn: async () => {
@@ -68,7 +67,7 @@ export default function AdminCalendar() {
     },
   });
 
-  // 2) FETCH Dentists for the dropdown
+  // 2) Dentists for the dropdown
   const { data: dentistData = [] } = useQuery<Dentist[]>({
     queryKey: ['dentists'],
     queryFn: async () => {
@@ -77,18 +76,18 @@ export default function AdminCalendar() {
     },
   });
 
-  // 3) FETCH appointments (with or without dentist filter)
+  // 3) Appointments (with or without dentist filter)
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
-      // Request a large number of appointments so they all display in the calendar
+      // Request a large number of appointments to display in the calendar
       const response = await getAppointments(1, 300, dentistIdNum);
-      return response.data; // { appointments: [...], meta: {...} }
+      return response.data;
     },
   });
 
-  // 4) FETCH closed days (so we can highlight them in the calendar)
+  // 4) Closed days
   const { data: closedData = [] } = useQuery<ClosedDay[]>({
     queryKey: ['closed-days'],
     queryFn: async () => {
@@ -97,28 +96,25 @@ export default function AdminCalendar() {
     },
   });
 
-  // Build the events from appointments, excluding those with status === 'cancelled'
+  // Filter out canceled appointments so they don’t clutter your calendar
   let appointments = apptData?.appointments || [];
   appointments = appointments.filter((appt) => appt.status !== 'cancelled');
 
   // Convert appointments => FullCalendar events
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    // If you store a duration in appointmentType, we can compute an end:
-    const dur = appt.appointmentType?.duration ?? 60;
+    const dur = appt.appointmentType?.duration ?? 60; // default 60 if missing
     const end = new Date(start.getTime() + dur * 60_000);
 
-    // Color based on status:
-    let backgroundColor = '#86efac'; // default for "scheduled"
+    // Colors based on status
+    let backgroundColor = '#86efac'; // "scheduled"
     if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd'; // light blue
+      backgroundColor = '#93c5fd';
     } else if (appt.status === 'cancelled') {
-      backgroundColor = '#fca5a5'; // red
+      backgroundColor = '#fca5a5';
     }
-
-    // Possibly highlight “checkedIn”
     if (appt.checkedIn) {
-      backgroundColor = '#fcd34d'; // gold/yellow for arrived
+      backgroundColor = '#fcd34d'; // gold
     }
 
     return {
@@ -134,22 +130,21 @@ export default function AdminCalendar() {
     };
   });
 
-  // Build “background events” for closed days
+  // Build background events for closed days
   const closedEvents = closedData.map((cd) => ({
     start: cd.date,
     end: cd.date,
     allDay: true,
     display: 'background',
-    backgroundColor: '#d1d5db', // gray-300
+    backgroundColor: '#d1d5db', // gray
     title: cd.reason || 'Closed Day',
     overlap: false,
   }));
 
   const allEvents = [...events, ...closedEvents];
 
-  // FULLCALENDAR handlers
+  // Calendar handlers
   const handleSelect = useCallback((selectInfo: SelectArg) => {
-    // We create a new appt on that day
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
     setIsModalOpen(true);
@@ -162,7 +157,6 @@ export default function AdminCalendar() {
   }, []);
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
-    // If background => that’s a closed day
     if (clickInfo.event.display === 'background') return;
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
     if (appt) {
@@ -203,11 +197,11 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // Not supporting changing end time by drag-resize => revert
+    // Not currently supporting drag-resize of appointment durations
     resizeInfo.revert();
   }, []);
 
-  // If we got an error from the appointments query
+  // If appointment query failed
   if (apptError) {
     return (
       <div className="text-red-600 p-4">
@@ -216,7 +210,6 @@ export default function AdminCalendar() {
     );
   }
 
-  // “Go to date” form submit
   function handleGoToDate(e: FormEvent) {
     e.preventDefault();
     if (!searchDate) return;
@@ -234,7 +227,7 @@ export default function AdminCalendar() {
 
   return (
     <div className="space-y-6">
-      {/* TOP BAR: Dentist filter, date search, legend, etc. */}
+      {/* TOP BAR: Dentist filter, date search */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         {/* Dentist Filter */}
         <div className="flex items-center gap-2">
@@ -253,7 +246,7 @@ export default function AdminCalendar() {
           </select>
         </div>
 
-        {/* “Go to Date” form */}
+        {/* “Go to Date” */}
         <form onSubmit={handleGoToDate} className="flex items-center gap-2">
           <label className="font-medium text-gray-700">Go to date:</label>
           <input
@@ -292,7 +285,9 @@ export default function AdminCalendar() {
 
       <FullCalendar
         ref={calendarRef}
+        // Use both dayGrid + timeGrid for month/week/day
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        // Start in week view (or change to 'timeGridDay' if you prefer day by default)
         initialView="timeGridWeek"
         selectable
         select={handleSelect}
@@ -301,16 +296,20 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
+        // By default show a 7am–7pm range, adjust as needed
         slotMinTime="07:00:00"
         slotMaxTime="19:00:00"
+        // 15-min increments for your time slots
         slotDuration="00:15:00"
         snapDuration="00:15:00"
         displayEventTime
         height="auto"
+        // Now we define custom buttons for: timeGridDay, timeGridWeek, dayGridMonth
         headerToolbar={{
           left: 'prev,today,next',
           center: 'title',
-          right: 'timeGridWeek,dayGridMonth, dayGridDay',
+          // We'll use 'timeGridDay', 'timeGridWeek', and 'dayGridMonth' for a consistent style
+          right: 'timeGridDay,timeGridWeek,dayGridMonth',
         }}
         businessHours={{
           daysOfWeek: openDays,
@@ -320,7 +319,7 @@ export default function AdminCalendar() {
         events={allEvents}
       />
 
-      {/* AdminAppointmentModal => create/update appointment */}
+      {/* Create/Edit Appointment Modal */}
       <AdminAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
