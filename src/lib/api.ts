@@ -332,9 +332,9 @@ export async function getSchedules() {
  * }
  * OR for simpler usage, if you still want to pass older fields like:
  * { clinic_open_time, clinic_close_time, open_days }
- * that’s a different structure. 
+ * that’s a different structure.
  *
- * Now that we have day-of-week settings, we usually pass 
+ * Now that we have day-of-week settings, we usually pass
  * { clinic_day_settings: [ ... ] } in the request body.
  */
 export async function updateSchedules(data: any) {
@@ -380,5 +380,36 @@ export async function uploadDentistImage(dentistId: number, file: File) {
 
   return api.post(`/dentists/${dentistId}/upload_image`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+/** ----------------------------------------------------------------
+ * APPOINTMENT REMINDERS (Admin-only)
+ * ----------------------------------------------------------------*/
+
+/**
+ * 1) Paginated + filtered reminders
+ *    GET /api/v1/appointment_reminders
+ *    e.g. /appointment_reminders?page=1&per_page=10&q=joe&status=queued&for_date=2025-01-12
+ */
+export async function getReminders(params: Record<string, any>) {
+  return api.get('/appointment_reminders', { params });
+}
+
+/**
+ * 2) Update a reminder
+ *    PATCH /api/v1/appointment_reminders/:id
+ *    expects { appointment_reminder: { ... } }
+ */
+export async function updateReminder(payload: {
+  id: number;
+  phone?: string;
+  status?: string;
+  message?: string;
+  scheduledFor?: string;
+}) {
+  const { id, ...body } = payload;
+  return api.patch(`/appointment_reminders/${id}`, {
+    appointment_reminder: body,
   });
 }

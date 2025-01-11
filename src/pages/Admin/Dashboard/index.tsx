@@ -8,6 +8,7 @@ import DashboardHeader from './DashboardHeader';
 import AdminCalendar from './AdminCalendar';
 import SchedulesList from './SchedulesList';
 import DentistsList from './DentistsList';
+import RemindersList from './RemindersList';
 
 export default function AdminDashboard() {
   return (
@@ -24,6 +25,7 @@ export default function AdminDashboard() {
               <TabsTrigger value="appointment-types">Appt Types</TabsTrigger>
               <TabsTrigger value="schedules">Schedules</TabsTrigger>
               <TabsTrigger value="dentists">Dentists</TabsTrigger>
+              <TabsTrigger value="reminders">Reminders</TabsTrigger>
             </TabsList>
 
             <TabsContent value="appointments">
@@ -43,6 +45,9 @@ export default function AdminDashboard() {
             </TabsContent>
             <TabsContent value="dentists">
               <DentistsList />
+            </TabsContent>
+            <TabsContent value="reminders">
+              <RemindersList />
             </TabsContent>
           </Tabs>
         </div>
