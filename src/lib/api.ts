@@ -307,14 +307,38 @@ export async function deleteClosedDay(id: number) {
 /** ----------------------------------------------------------------
  * SCHEDULES (Admin-only)
  * ----------------------------------------------------------------*/
+
+/**
+ * The updated `getSchedules()` endpoint returns:
+ * {
+ *   clinicDaySettings: [
+ *     { id, dayOfWeek, isOpen, openTime, closeTime },
+ *     ...
+ *   ],
+ *   closedDays: [...],
+ *   dentistUnavailabilities: [...]
+ * }
+ */
 export async function getSchedules() {
   return api.get('/schedule');
 }
-export async function updateSchedules(data: {
-  clinic_open_time: string;
-  clinic_close_time: string;
-  open_days?: number[];
-}) {
+
+/**
+ * The updated `updateSchedules()` endpoint can accept:
+ * {
+ *   clinic_day_settings: [
+ *     { day_of_week, is_open, open_time, close_time }, ...
+ *   ]
+ * }
+ * OR for simpler usage, if you still want to pass older fields like:
+ * { clinic_open_time, clinic_close_time, open_days }
+ * that’s a different structure. 
+ *
+ * Now that we have day-of-week settings, we usually pass 
+ * { clinic_day_settings: [ ... ] } in the request body.
+ */
+export async function updateSchedules(data: any) {
+  // e.g. data = { clinic_day_settings: [ ... ] }
   return api.patch('/schedule', data);
 }
 
@@ -323,9 +347,9 @@ export async function updateSchedules(data: {
  * ----------------------------------------------------------------*/
 export async function createDentistUnavailability(data: {
   dentist_id: number;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
+  date: string;       // "YYYY-MM-DD"
+  start_time: string; // "HH:mm"
+  end_time: string;   // "HH:mm"
 }) {
   return api.post('/dentist_unavailabilities', {
     dentist_unavailability: data,
@@ -334,7 +358,7 @@ export async function createDentistUnavailability(data: {
 export async function updateDentistUnavailability(
   id: number,
   data: {
-    day_of_week: number;
+    date: string;
     start_time: string;
     end_time: string;
   }

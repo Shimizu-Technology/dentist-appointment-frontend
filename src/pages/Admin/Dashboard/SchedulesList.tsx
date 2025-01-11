@@ -1,4 +1,5 @@
 // File: /src/pages/Admin/Dashboard/SchedulesList.tsx
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,6 +16,14 @@ import Button from '../../../components/UI/Button';
 import { format, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
+interface ClinicDaySetting {
+  id: number;
+  dayOfWeek: number;    // 0=Sunday, 1=Monday, ...
+  isOpen: boolean;
+  openTime: string;     // "HH:MM"
+  closeTime: string;    // "HH:MM"
+}
+
 export default function SchedulesList() {
   const queryClient = useQueryClient();
 
@@ -23,7 +32,8 @@ export default function SchedulesList() {
     queryKey: ['schedules'],
     queryFn: async () => {
       const res = await getSchedules();
-      return res.data;
+      return res.data; 
+      // => { clinicDaySettings, closedDays, dentistUnavailabilities, ... }
     },
   });
 
@@ -41,51 +51,64 @@ export default function SchedulesList() {
   });
 
   // ----------------------------------------------------------------
-  // 2) CLINIC HOURS + OPEN DAYS
+  // 2) CLINIC DAY SETTINGS
   // ----------------------------------------------------------------
-  const [newOpenTime, setNewOpenTime] = useState('');
-  const [newCloseTime, setNewCloseTime] = useState('');
-  // We'll store openDays as a set of numbers {0,1,2,3,4,5,6}
-  const [openDays, setOpenDays] = useState<Set<number>>(new Set([1,2,3,4,5]));
+  const [daySettings, setDaySettings] = useState<ClinicDaySetting[]>([]);
 
-  // Once data loads, initialize state with existing values
   useEffect(() => {
-    if (data) {
-      setNewOpenTime(data.clinicOpenTime || '');
-      setNewCloseTime(data.clinicCloseTime || '');
-      if (Array.isArray(data.openDays)) {
-        setOpenDays(new Set(data.openDays)); 
-      }
+    if (data?.clinicDaySettings) {
+      setDaySettings(data.clinicDaySettings);
     }
   }, [data]);
 
-  const updateSchedulesMut = useMutation({
-    mutationFn: (payload: {
-      clinic_open_time: string;
-      clinic_close_time: string;
-      open_days: number[];
-    }) => updateSchedules(payload),
+  // Mutation to “bulk update” day-of-week settings
+  const updateDaySettingsMut = useMutation({
+    mutationFn: async (updates: ClinicDaySetting[]) => {
+      // Convert to snake_case before sending:
+      const payload = {
+        clinic_day_settings: updates.map((ds) => ({
+          id: ds.id,
+          day_of_week: ds.dayOfWeek,
+          is_open: ds.isOpen,
+          open_time: ds.openTime,
+          close_time: ds.closeTime,
+        })),
+      };
+      return updateSchedules(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
-      toast.success('Clinic schedule updated!');
+      toast.success('Clinic Day Settings updated!');
     },
     onError: (err: any) => {
-      toast.error(`Failed to update clinic hours: ${err.message}`);
+      toast.error(`Failed to update day settings: ${err.message}`);
     },
   });
 
-  function handleToggleDay(day: number) {
-    // If day is in the set, remove it; else add it
-    setOpenDays(prev => {
-      const copy = new Set(prev);
-      if (copy.has(day)) copy.delete(day);
-      else copy.add(day);
-      return copy;
-    });
+  // Handler for toggling isOpen
+  function handleToggleIsOpen(dayOfWeek: number) {
+    setDaySettings((prev) =>
+      prev.map((ds) =>
+        ds.dayOfWeek === dayOfWeek
+          ? { ...ds, isOpen: !ds.isOpen }
+          : ds
+      )
+    );
+  }
+
+  // Handler for changing open/close times
+  function handleTimeChange(dayOfWeek: number, which: 'openTime' | 'closeTime', value: string) {
+    setDaySettings((prev) =>
+      prev.map((ds) =>
+        ds.dayOfWeek === dayOfWeek
+          ? { ...ds, [which]: value }
+          : ds
+      )
+    );
   }
 
   // ----------------------------------------------------------------
-  // 3) CLOSED DAYS: SINGLE + MULTI-DAY
+  // 3) CLOSED DAYS
   // ----------------------------------------------------------------
   const [closedDate, setClosedDate] = useState('');
   const [closedReason, setClosedReason] = useState('');
@@ -146,7 +169,7 @@ export default function SchedulesList() {
       const dateStr = format(curr, 'yyyy-MM-dd');
       await createClosedDayMut.mutateAsync({
         date: dateStr,
-        reason: closedReason || undefined
+        reason: closedReason || undefined,
       });
       curr = addDays(curr, 1);
     }
@@ -158,27 +181,26 @@ export default function SchedulesList() {
   }
 
   // ----------------------------------------------------------------
-  // 4) DENTIST UNAVAILABILITIES - CREATE
+  // 4) DENTIST UNAVAILABILITIES
   // ----------------------------------------------------------------
   const [selectedDentist, setSelectedDentist] = useState('');
-  const [dayOfWeek /* now unused in this approach */, setDayOfWeek] = useState('1');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [dateString, setDateString] = useState(''); // if you want a date instead of dayOfWeek
+  const [dateString, setDateString] = useState('');
 
   const createAvailMut = useMutation({
     mutationFn: (payload: {
       dentist_id: number;
-      date: string;        // "YYYY-MM-DD"
-      start_time: string;  // "HH:mm"
-      end_time: string;    // "HH:mm"
+      date: string;
+      start_time: string;
+      end_time: string;
     }) => createDentistUnavailability(payload),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
       toast.success('Dentist unavailability created!');
     },
     onError: (err: any) => {
-      toast.error(`Failed to create dentist availability: ${err.message}`);
+      toast.error(`Failed to create dentist unavailability: ${err.message}`);
     },
   });
 
@@ -194,22 +216,21 @@ export default function SchedulesList() {
       end_time: endTime,
     });
     setSelectedDentist('');
-    setDayOfWeek('1');
     setDateString('');
     setStartTime('');
     setEndTime('');
   }
 
   // ----------------------------------------------------------------
-  // 5) DENTIST UNAVAILABILITIES - EDIT (Modal)
+  // 5) EDITING EXISTING UNAVAILABILITY
   // ----------------------------------------------------------------
   const [editAvailModalOpen, setEditAvailModalOpen] = useState(false);
   const [editingAvail, setEditingAvail] = useState<{
     id: number;
     dentist_id: number;
-    date: string;       // "YYYY-MM-DD"
-    start_time: string; // "HH:mm"
-    end_time: string;   // "HH:mm"
+    date: string;
+    start_time: string;
+    end_time: string;
   } | null>(null);
 
   function handleEditClick(av: any) {
@@ -229,11 +250,12 @@ export default function SchedulesList() {
       date: string;
       start_time: string;
       end_time: string;
-    }) => updateDentistUnavailability(payload.id, {
-      date: payload.date,
-      start_time: payload.start_time,
-      end_time: payload.end_time,
-    }),
+    }) =>
+      updateDentistUnavailability(payload.id, {
+        date: payload.date,
+        start_time: payload.start_time,
+        end_time: payload.end_time,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries(['schedules']);
       setEditAvailModalOpen(false);
@@ -256,7 +278,7 @@ export default function SchedulesList() {
   }
 
   // ----------------------------------------------------------------
-  // 6) DENTIST UNAVAILABILITIES - DELETE
+  // 6) DELETE UNAVAILABILITY
   // ----------------------------------------------------------------
   const deleteAvailMut = useMutation({
     mutationFn: (id: number) => deleteDentistUnavailability(id),
@@ -270,96 +292,87 @@ export default function SchedulesList() {
   });
 
   // ----------------------------------------------------------------
-  // 7) RENDER LOADING/ERROR STATES
+  // 7) RENDER LOADING/ERROR
   // ----------------------------------------------------------------
-  if (isLoading) return <div>Loading schedules...</div>;
-  if (error) return <div className="text-red-600">Error loading schedules.</div>;
-  if (!data) return null;
+  if (isLoading) {
+    return <div>Loading schedules...</div>;
+  }
+  if (error) {
+    return <div className="text-red-600">Error loading schedules.</div>;
+  }
+  if (!data) {
+    return null;
+  }
 
-  // *** KEY CHANGE: We destructure "dentistUnavailabilities" instead of "dentistAvailabilities" ***
-  const { 
-    closedDays = [],
-    dentistUnavailabilities = [],
-  } = data;
+  // Extract arrays from the returned `data`
+  const { closedDays = [], dentistUnavailabilities = [] } = data;
 
-  // Helper: find dentist name
+  // Dentist name helper
   function dentistName(dentistId: number) {
     const d = dentistList.find((doc: any) => doc.id === dentistId);
     if (!d) return `Dentist #${dentistId}`;
     return `Dr. ${d.firstName} ${d.lastName}`;
   }
 
+  // For label display
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-  // ----------------------------------------------------------------
-  // UI RETURN
-  // ----------------------------------------------------------------
   return (
     <div className="space-y-8">
-      {/* CLINIC HOURS + OPEN DAYS */}
+      {/* 1) DAY-OF-WEEK CLINIC SETTINGS */}
       <section className="bg-white p-4 rounded shadow space-y-4">
-        <h2 className="text-xl font-semibold">Clinic Hours (Global)</h2>
-        <p>
-          Currently: <strong>{data.clinicOpenTime}</strong> to <strong>{data.clinicCloseTime}</strong>
+        <h2 className="text-xl font-semibold">Clinic Day Settings</h2>
+        <p className="text-gray-600 text-sm">
+          Configure each day’s open/close time or mark it as closed.
+          The front-end calendar will respect these hours for that weekday.
         </p>
 
-        {/* Open/Close Time */}
-        <div className="flex items-center space-x-2">
-          <input
-            type="time"
-            placeholder="Open Time"
-            value={newOpenTime}
-            onChange={(e) => setNewOpenTime(e.target.value)}
-            className="border p-1"
-          />
-          <input
-            type="time"
-            placeholder="Close Time"
-            value={newCloseTime}
-            onChange={(e) => setNewCloseTime(e.target.value)}
-            className="border p-1"
-          />
-        </div>
-
-        {/* Open Days checkboxes */}
-        <div className="mt-2">
-          <p className="font-medium">Clinic Open Days:</p>
-          <div className="flex flex-wrap gap-3 mt-1">
-            {dayNames.map((dn, index) => {
-              const checked = openDays.has(index);
-              return (
-                <label key={index} className="flex items-center space-x-1">
+        {daySettings.map((ds) => (
+          <div key={ds.dayOfWeek} className="flex flex-wrap items-center gap-4">
+            <div className="w-32 font-medium">{dayNames[ds.dayOfWeek]}</div>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={ds.isOpen}
+                onChange={() => handleToggleIsOpen(ds.dayOfWeek)}
+              />
+              <span>Open?</span>
+            </label>
+            {ds.isOpen && (
+              <>
+                <div>
+                  <label className="block text-sm">Open Time</label>
                   <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => handleToggleDay(index)}
+                    type="time"
+                    value={ds.openTime}
+                    onChange={(e) => handleTimeChange(ds.dayOfWeek, 'openTime', e.target.value)}
+                    className="border p-1"
                   />
-                  <span>{dn}</span>
-                </label>
-              );
-            })}
+                </div>
+                <div>
+                  <label className="block text-sm">Close Time</label>
+                  <input
+                    type="time"
+                    value={ds.closeTime}
+                    onChange={(e) => handleTimeChange(ds.dayOfWeek, 'closeTime', e.target.value)}
+                    className="border p-1"
+                  />
+                </div>
+              </>
+            )}
           </div>
-        </div>
+        ))}
 
         <Button
-          onClick={() => {
-            if (!newOpenTime || !newCloseTime) {
-              toast.error('Please enter open & close times');
-              return;
-            }
-            updateSchedulesMut.mutate({
-              clinic_open_time: newOpenTime,
-              clinic_close_time: newCloseTime,
-              open_days: Array.from(openDays), // convert Set to array
-            });
-          }}
-          isLoading={updateSchedulesMut.isLoading}
+          onClick={() => updateDaySettingsMut.mutate(daySettings)}
+          isLoading={updateDaySettingsMut.isLoading}
+          className="mt-4"
         >
-          Update Clinic Hours
+          Save Day-of-Week Settings
         </Button>
       </section>
 
-      {/* CLOSED DAYS */}
+      {/* 2) CLOSED DAYS */}
       <section className="bg-white p-4 rounded shadow space-y-4">
         <h2 className="text-xl font-semibold">Closed Days</h2>
 
@@ -424,8 +437,10 @@ export default function SchedulesList() {
                 className="flex items-center justify-between bg-gray-50 p-2 rounded"
               >
                 <div>
-                  <strong>{cd.date}</strong>{' '}
-                  {cd.reason && <span className="text-gray-600">({cd.reason})</span>}
+                  <strong>{cd.date}</strong>
+                  {cd.reason && (
+                    <span className="text-gray-600"> ({cd.reason})</span>
+                  )}
                 </div>
                 <Button
                   variant="danger"
@@ -441,10 +456,11 @@ export default function SchedulesList() {
         )}
       </section>
 
-      {/* DENTIST “UNAVAILABILITIES” (the code calls it Availabilities, but they are the blocks) */}
+      {/* 3) DENTIST UNAVAILABILITIES */}
       <section className="bg-white p-4 rounded shadow space-y-4">
         <h2 className="text-xl font-semibold">Dentist Unavailabilities</h2>
-        {/* CREATE form */}
+
+        {/* Create new unavailability */}
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={selectedDentist}
@@ -458,7 +474,6 @@ export default function SchedulesList() {
               </option>
             ))}
           </select>
-          {/* If you want a date-based approach: */}
           <input
             type="date"
             value={dateString}
@@ -487,7 +502,7 @@ export default function SchedulesList() {
           </Button>
         </div>
 
-        {/* TABLE of existing unavailabilities */}
+        {/* List existing unavailabilities */}
         {(!dentistUnavailabilities || dentistUnavailabilities.length === 0) ? (
           <p className="text-gray-500">No dentist unavailabilities found.</p>
         ) : (
@@ -507,10 +522,18 @@ export default function SchedulesList() {
               <tbody>
                 {dentistUnavailabilities.map((av: any) => (
                   <tr key={av.id}>
-                    <td className="border px-4 py-2">{dentistName(av.dentistId)}</td>
-                    <td className="border px-4 py-2 text-center">{av.date}</td>
-                    <td className="border px-4 py-2 text-center">{av.startTime}</td>
-                    <td className="border px-4 py-2 text-center">{av.endTime}</td>
+                    <td className="border px-4 py-2">
+                      {dentistName(av.dentistId)}
+                    </td>
+                    <td className="border px-4 py-2 text-center">
+                      {av.date}
+                    </td>
+                    <td className="border px-4 py-2 text-center">
+                      {av.startTime}
+                    </td>
+                    <td className="border px-4 py-2 text-center">
+                      {av.endTime}
+                    </td>
                     <td className="border px-4 py-2 text-center">
                       <div className="flex justify-center gap-2">
                         <Button
@@ -538,12 +561,13 @@ export default function SchedulesList() {
         )}
       </section>
 
-      {/* EDIT AVAILABILITY MODAL */}
+      {/* EDIT UNAVAILABILITY MODAL */}
       {editAvailModalOpen && editingAvail && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-xl font-semibold mb-4">Edit Availability</h3>
+            <h3 className="text-xl font-semibold mb-4">Edit Unavailability</h3>
 
+            {/* Dentist Name (read-only) */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Dentist
@@ -556,7 +580,7 @@ export default function SchedulesList() {
               />
             </div>
 
-            {/* date */}
+            {/* Date */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date
@@ -573,7 +597,7 @@ export default function SchedulesList() {
               />
             </div>
 
-            {/* start_time */}
+            {/* Start Time */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Start Time
@@ -590,7 +614,7 @@ export default function SchedulesList() {
               />
             </div>
 
-            {/* end_time */}
+            {/* End Time */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 End Time
@@ -607,8 +631,12 @@ export default function SchedulesList() {
               />
             </div>
 
+            {/* Buttons */}
             <div className="flex justify-end space-x-4 pt-4">
-              <Button variant="secondary" onClick={() => setEditAvailModalOpen(false)}>
+              <Button
+                variant="secondary"
+                onClick={() => setEditAvailModalOpen(false)}
+              >
                 Cancel
               </Button>
               <Button

@@ -16,8 +16,7 @@ import interactionPlugin, {
 import {
   getAppointments,
   getDentists,
-  getSchedules,
-  getClosedDays,
+  getSchedules, // <--- consolidated schedules call
   updateAppointment,
 } from '../../../lib/api';
 import type { Appointment, Dentist, ClosedDay } from '../../../types';
@@ -35,21 +34,20 @@ interface PaginatedAppointments {
   };
 }
 
-interface SchedulesResponse {
-  clinicOpenTime: string;   // e.g. "09:00"
-  clinicCloseTime: string;  // e.g. "17:00"
-  openDays: number[];       // e.g. [1,2,3,4,5]
-  closedDays?: any[];
-  dentistUnavailabilities?: any[];
+interface ClinicDaySetting {
+  id: number;
+  dayOfWeek: number;  // 0=Sun..6=Sat
+  isOpen: boolean;
+  openTime: string;   // "09:00"
+  closeTime: string;  // "17:00"
 }
 
 export default function AdminCalendar() {
   const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
-  // State for filtering by dentist
+  // Filtering by dentist
   const [selectedDentistId, setSelectedDentistId] = useState<string>('');
-
   // “Go to date” feature
   const [searchDate, setSearchDate] = useState('');
 
@@ -58,14 +56,18 @@ export default function AdminCalendar() {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
-  // 1) Schedules data (open/close times, openDays, etc.)
-  const { data: scheduleData } = useQuery<SchedulesResponse>({
-    queryKey: ['schedule-data'],
+  // 1) Fetch the consolidated schedule data
+  const { data: scheduleData } = useQuery({
+    queryKey: ['schedules'],
     queryFn: async () => {
       const res = await getSchedules();
-      return res.data;
+      return res.data; // => { clinicDaySettings, closedDays, dentistUnavailabilities, etc. }
     },
   });
+
+  // Extract day-of-week settings & closed days
+  const daySettings: ClinicDaySetting[] = scheduleData?.clinicDaySettings || [];
+  const closedData: ClosedDay[] = scheduleData?.closedDays || [];
 
   // 2) Dentists for the dropdown
   const { data: dentistData = [] } = useQuery<Dentist[]>({
@@ -76,45 +78,32 @@ export default function AdminCalendar() {
     },
   });
 
-  // 3) Appointments (with or without dentist filter)
+  // 3) Appointments
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
-      // Request a large number of appointments to display in the calendar
       const response = await getAppointments(1, 300, dentistIdNum);
       return response.data;
     },
   });
 
-  // 4) Closed days
-  const { data: closedData = [] } = useQuery<ClosedDay[]>({
-    queryKey: ['closed-days'],
-    queryFn: async () => {
-      const res = await getClosedDays();
-      return res.data;
-    },
-  });
-
-  // Filter out canceled appointments so they don’t clutter your calendar
+  // Filter out cancelled
   let appointments = apptData?.appointments || [];
   appointments = appointments.filter((appt) => appt.status !== 'cancelled');
 
-  // Convert appointments => FullCalendar events
+  // Build appointment events
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    const dur = appt.appointmentType?.duration ?? 60; // default 60 if missing
-    const end = new Date(start.getTime() + dur * 60_000);
+    const dur = appt.appointmentType?.duration ?? 60;
+    const end = new Date(start.getTime() + dur * 60000);
 
-    // Colors based on status
-    let backgroundColor = '#86efac'; // "scheduled"
+    let backgroundColor = '#86efac'; // default scheduled = green
     if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd';
-    } else if (appt.status === 'cancelled') {
-      backgroundColor = '#fca5a5';
+      backgroundColor = '#93c5fd'; // completed = light blue
     }
     if (appt.checkedIn) {
-      backgroundColor = '#fcd34d'; // gold
+      backgroundColor = '#fcd34d'; // checked in = yellow
     }
 
     return {
@@ -130,7 +119,7 @@ export default function AdminCalendar() {
     };
   });
 
-  // Build background events for closed days
+  // Closed days as background events
   const closedEvents = closedData.map((cd) => ({
     start: cd.date,
     end: cd.date,
@@ -141,9 +130,19 @@ export default function AdminCalendar() {
     overlap: false,
   }));
 
+  // Combine them
   const allEvents = [...events, ...closedEvents];
 
-  // Calendar handlers
+  // Convert clinicDaySettings => FullCalendar “businessHours”
+  const businessHours = daySettings
+    .filter((ds) => ds.isOpen)
+    .map((ds) => ({
+      daysOfWeek: [ds.dayOfWeek],
+      startTime: ds.openTime,
+      endTime: ds.closeTime,
+    }));
+
+  // Event handlers
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -186,7 +185,9 @@ export default function AdminCalendar() {
         return;
       }
       try {
-        await updateAppointment(appt.id, { appointment_time: event.start.toISOString() });
+        await updateAppointment(appt.id, {
+          appointment_time: event.start.toISOString(),
+        });
         queryClient.invalidateQueries(['admin-appointments-for-calendar', selectedDentistId]);
       } catch (err: any) {
         toast.error('Could not reschedule appointment.');
@@ -197,11 +198,10 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // Not currently supporting drag-resize of appointment durations
+    // Not supporting drag-resize to change durations
     resizeInfo.revert();
   }, []);
 
-  // If appointment query failed
   if (apptError) {
     return (
       <div className="text-red-600 p-4">
@@ -220,10 +220,6 @@ export default function AdminCalendar() {
     }
     calendarRef.current?.getApi().gotoDate(parsed);
   }
-
-  const openDays = scheduleData?.openDays ?? [1, 2, 3, 4, 5];
-  const openTime = scheduleData?.clinicOpenTime ?? '09:00';
-  const closeTime = scheduleData?.clinicCloseTime ?? '17:00';
 
   return (
     <div className="space-y-6">
@@ -270,10 +266,6 @@ export default function AdminCalendar() {
           Completed
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#fca5a5' }} />
-          Cancelled
-        </div>
-        <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#fcd34d' }} />
           Checked In
         </div>
@@ -285,9 +277,7 @@ export default function AdminCalendar() {
 
       <FullCalendar
         ref={calendarRef}
-        // Use both dayGrid + timeGrid for month/week/day
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        // Start in week view (or change to 'timeGridDay' if you prefer day by default)
         initialView="timeGridWeek"
         selectable
         select={handleSelect}
@@ -296,25 +286,20 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        // By default show a 7am–7pm range, adjust as needed
+        // Only show 7am to 7pm
         slotMinTime="07:00:00"
         slotMaxTime="19:00:00"
-        // 15-min increments for your time slots
+        // Business hours from daySettings
+        businessHours={businessHours}
+        // Snap to 15-min increments
         slotDuration="00:15:00"
         snapDuration="00:15:00"
         displayEventTime
         height="auto"
-        // Now we define custom buttons for: timeGridDay, timeGridWeek, dayGridMonth
         headerToolbar={{
           left: 'prev,today,next',
           center: 'title',
-          // We'll use 'timeGridDay', 'timeGridWeek', and 'dayGridMonth' for a consistent style
           right: 'timeGridDay,timeGridWeek,dayGridMonth',
-        }}
-        businessHours={{
-          daysOfWeek: openDays,
-          startTime: openTime,
-          endTime: closeTime,
         }}
         events={allEvents}
       />

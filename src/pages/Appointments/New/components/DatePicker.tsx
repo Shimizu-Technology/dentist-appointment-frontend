@@ -1,161 +1,138 @@
-// File: /src/pages/Appointments/New/components/DatePicker.tsx
-
+import 'react-day-picker/dist/style.css'; // <--- Make sure to import DayPicker CSS
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DayPicker } from 'react-day-picker';
-import { format, addMonths, isBefore, isAfter, parseISO } from 'date-fns';
+import { parseISO, isBefore, isAfter, format } from 'date-fns';
 import { useFormContext, useWatch } from 'react-hook-form';
-import 'react-day-picker/style.css';
 
+// We no longer import getClinicDaySettings or getClosedDays separately.
+// Instead, we’ll fetch them from getSchedules().
 import { getSchedules, getDentistAvailability } from '../../../../lib/api';
 
 interface DentistUnavailability {
   id: number;
   dentistId: number;
-  date: string;      // "YYYY-MM-DD"
-  startTime: string; // "HH:mm"
-  endTime: string;   // "HH:mm"
+  date: string;   // "YYYY-MM-DD"
+  startTime: string;
+  endTime: string;
   reason?: string;
 }
-
 interface ClosedDay {
   id: number;
-  date: string; // "YYYY-MM-DD"
+  date: string;
   reason?: string;
 }
-
-interface SchedulesResponse {
-  clinicOpenTime: string;
-  clinicCloseTime: string;
-  openDays: number[]; // e.g. [1,2,3,4,5]
-  closedDays: ClosedDay[];
-  dentistUnavailabilities: DentistUnavailability[];
+interface ClinicDaySetting {
+  id: number;
+  dayOfWeek: number;    // 0=Sunday..6=Saturday
+  isOpen: boolean;
+  openTime: string;     // "HH:mm"
+  closeTime: string;    // "HH:mm"
 }
 
 export default function DatePicker() {
   const { control, setValue } = useFormContext();
 
-  // 1) Watch the dentist and the currently selected date (string "YYYY-MM-DD")
-  const dentistId = useWatch({ control, name: 'dentist_id' });
-  const selectedDateStr = useWatch({ control, name: 'appointment_date' });
+  // Watch fields from the form
+  const dentistId = useWatch({ name: 'dentist_id', control });
+  const selectedDateStr = useWatch({ name: 'appointment_date', control });
 
-  // 2) Convert "YYYY-MM-DD" -> Date, or undefined if invalid
+  // Convert "YYYY-MM-DD" -> Date
   const selectedDate = useMemo(() => {
     if (!selectedDateStr) return undefined;
-    const parsed = parseISO(selectedDateStr); // or new Date(selectedDateStr)
-    return isNaN(parsed.getTime()) ? undefined : parsed;
+    const d = parseISO(selectedDateStr);
+    return isNaN(d.getTime()) ? undefined : d;
   }, [selectedDateStr]);
 
-  // 3) Use local state to control which month the calendar shows
+  // Local state to track which month is displayed
   const [month, setMonth] = useState<Date>(selectedDate || new Date());
 
-  // Whenever the selected date changes (e.g. form resets), jump the calendar to it
+  // After the user picks a date, ensure the calendar focuses that date
   useEffect(() => {
     if (selectedDate) {
       setMonth(selectedDate);
     }
   }, [selectedDate]);
 
-  // 4) Fetch schedules and partial unavailabilities
-  const {
-    data: scheduleData,
-    isLoading: scheduleLoading,
-    isError: scheduleError,
-  } = useQuery<SchedulesResponse>({
-    queryKey: ['schedules'],
+  /**
+   * Fetch schedule data from GET /schedule so we can get:
+   * - clinicDaySettings
+   * - closedDays
+   */
+  const { data: scheduleData } = useQuery({
+    queryKey: ['schedule-data'],
     queryFn: async () => {
       const res = await getSchedules();
-      return res.data;
+      return res.data; 
+      // => { clinicDaySettings: [...], closedDays: [...], dentistUnavailabilities: [...] }
     },
   });
+  // Extract arrays (fallback to []) so they’re never undefined
+  const daySettings: ClinicDaySetting[] = scheduleData?.clinicDaySettings || [];
+  const closedDays: ClosedDay[] = scheduleData?.closedDays || [];
 
-  const {
-    data: dentistUnavailData = [],
-    isLoading: dentistLoading,
-    isError: dentistError,
-  } = useQuery<DentistUnavailability[]>({
+  // Dentist unavailability (for partial-day blocks), if needed
+  const { data: unavailData = [] } = useQuery<DentistUnavailability[]>({
     queryKey: ['dentist-availability', dentistId],
     queryFn: async () => {
       if (!dentistId) return [];
       const res = await getDentistAvailability(Number(dentistId));
-      return res.data;
+      return res.data; 
+      // => array of unavailability objects
     },
     enabled: !!dentistId,
   });
 
-  // 5) Limit selection from [today .. +6 months]
+  // Limit selection to [today..+6 months]
   const minDate = new Date();
-  const maxDate = addMonths(minDate, 6);
+  const maxDate = new Date();
+  maxDate.setMonth(maxDate.getMonth() + 6);
 
-  // 6) Decide if a day is disabled
+  // DayPicker callback to disable certain days
   const isDayDisabled = useCallback(
     (day: Date): boolean => {
-      if (!scheduleData) return true;
+      // If daySettings not loaded yet, disable
+      if (!daySettings.length) return true;
 
-      // (a) If day is outside [minDate, maxDate], disable
+      // Outside [minDate..maxDate]
       if (isBefore(day, minDate) || isAfter(day, maxDate)) return true;
 
-      // (b) If day’s weekday not in scheduleData.openDays, disable
-      const wday = day.getDay(); // 0=Sunday,1=Monday,...
-      if (!scheduleData.openDays.includes(wday)) {
-        return true;
-      }
-
-      // (c) If the clinic is globally closed that day
+      // If closedDays includes this date
       const dateStr = format(day, 'yyyy-MM-dd');
-      const isGloballyClosed = scheduleData.closedDays.some(
-        (cd) => cd.date === dateStr
-      );
-      if (isGloballyClosed) {
+      if (closedDays.some((cd) => cd.date === dateStr)) {
         return true;
       }
 
-      // (d) REMOVE the old logic that “any unavailability => entire day blocked”
-      // We now allow partial day usage, so we do NOT disable the day
-      // just because unavailability exists.
+      // If dayOfWeek is not open
+      const wday = day.getDay(); // 0=Sun..6=Sat
+      const setting = daySettings.find((ds) => ds.dayOfWeek === wday);
+      if (!setting || !setting.isOpen) {
+        return true;
+      }
 
-      return false; // The day is allowed
+      return false;
     },
-    [scheduleData, minDate, maxDate]
+    [daySettings, closedDays, minDate, maxDate]
   );
 
-  // 7) When user picks a day
+  // When a day is clicked
   const handleDayClick = (day: Date | undefined) => {
     if (!day) return;
     const dateStr = format(day, 'yyyy-MM-dd');
-    // Update form
-    setValue('appointment_date', dateStr, {
-      shouldTouch: true,
-      shouldValidate: true,
-    });
-    // Clear the time if changing date
+    setValue('appointment_date', dateStr, { shouldTouch: true, shouldValidate: true });
+    // Clear the time (since date changed)
     setValue('appointment_time', '');
   };
 
-  // 8) Show loading/error placeholders
-  if (scheduleLoading || dentistLoading) {
-    return <p className="text-gray-500 mt-2">Loading schedule...</p>;
-  }
-  if (scheduleError) {
-    return <p className="text-red-600 mt-2">Failed to load clinic schedule.</p>;
-  }
-  if (dentistError) {
-    return <p className="text-red-600 mt-2">Failed to load dentist availability.</p>;
-  }
-  if (!scheduleData) {
-    return <p className="text-red-600 mt-2">No schedule data found.</p>;
-  }
   if (!dentistId) {
     return <p className="text-gray-500 mt-2">Please select a dentist first.</p>;
   }
 
-  // 9) Render
   return (
     <div className="my-4">
       <label className="mb-2 text-sm text-gray-700 font-medium block">
         Pick an Appointment Date
       </label>
-
       <DayPicker
         mode="single"
         month={month}
