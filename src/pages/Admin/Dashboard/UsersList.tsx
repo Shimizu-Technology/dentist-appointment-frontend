@@ -1,15 +1,15 @@
 // File: /src/pages/Admin/Dashboard/UsersList.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchUsers, getUsers } from '../../../lib/api';
-import type { User } from '../../../types';
+import PaginationControls from '../../../components/UI/PaginationControls';
 import Button from '../../../components/UI/Button';
 import UserModal from './UserModal';
-import PaginationControls from '../../../components/UI/PaginationControls'; // <-- NEW
+import type { User } from '../../../types';
 import toast from 'react-hot-toast';
 
-interface UsersApiResponse {
+interface PaginatedUsers {
   users: User[];
   meta: {
     currentPage: number;
@@ -20,169 +20,156 @@ interface UsersApiResponse {
 }
 
 export default function UsersList() {
-  const [page, setPage] = useState(1);
-
-  // Search
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
+  const [page, setPage] = useState(1);
 
-  // Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // For UserModal
+  const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // Search input focus
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [isSearchFocused, setIsSearchFocused] = useState(true);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPage(1);
-    setSearchTerm(e.target.value);
-    setIsSearchFocused(true);
-  };
-  const handleSearchFocus = () => setIsSearchFocused(true);
-  const handleSearchBlur = () => setIsSearchFocused(false);
-
+  // Debounce the search
   useEffect(() => {
-    if (isSearchFocused) {
-      searchRef.current?.focus();
-    }
-  }, [isSearchFocused]);
-
-  // Debounce
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedTerm(searchTerm), 500);
+    const t = setTimeout(() => {
+      setDebouncedTerm(searchTerm.trim());
+      setPage(1);
+    }, 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const { data, isLoading, error, isFetching, refetch } = useQuery<UsersApiResponse>({
-    queryKey: ['users', page, debouncedTerm],
+  // Query => load users (paginated)
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+  } = useQuery<PaginatedUsers>({
+    queryKey: ['admin-users', debouncedTerm, page],
     queryFn: async () => {
-      if (debouncedTerm.trim()) {
-        const response = await searchUsers(debouncedTerm.toLowerCase(), page, 10);
-        return response.data;
+      if (debouncedTerm) {
+        const res = await searchUsers(debouncedTerm, page, 10);
+        return res.data; // { users, meta }
       } else {
-        const response = await getUsers(page, 10);
-        return response.data;
+        const res = await getUsers(page, 10);
+        return res.data; // { users, meta }
       }
     },
     keepPreviousData: true,
   });
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12">
-        <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full mx-auto"></div>
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="text-center py-12 text-red-600">
-        Failed to load users. Please try again later.
-      </div>
-    );
-  }
-  if (!data) {
-    return <div className="text-center py-12">No user data found.</div>;
-  }
-
-  const { users, meta } = data;
-
-  function openCreateModal() {
-    setEditingUser(null);
-    setIsModalOpen(true);
-  }
-  function openEditModal(u: User) {
-    setEditingUser(u);
-    setIsModalOpen(true);
-  }
+  const users = data?.users || [];
+  const meta = data?.meta;
 
   function handleClearSearch() {
     setSearchTerm('');
     setDebouncedTerm('');
     setPage(1);
-    setIsSearchFocused(true);
+  }
+
+  function handleCreateUser() {
+    setEditingUser(null);
+    setUserModalOpen(true);
+  }
+
+  function handleEditUser(u: User) {
+    setEditingUser(u);
+    setUserModalOpen(true);
+  }
+
+  // A helper for color-coded role badges:
+  function roleBadgeClass(role: string) {
+    switch (role) {
+      case 'admin':
+        return 'bg-purple-100 text-purple-800';
+      case 'user':
+        return 'bg-green-100 text-green-800';
+      case 'phone_only':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-gray-900">All Users</h2>
+      <h1 className="text-2xl font-semibold">All Users</h1>
 
-      {/* SEARCH BAR */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Search by Name or Email
-        </label>
-        <input
-          ref={searchRef}
-          type="text"
-          value={searchTerm}
-          onChange={handleSearchChange}
-          onFocus={handleSearchFocus}
-          onBlur={handleSearchBlur}
-          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="e.g. 'Jane', 'user@example.com'"
-        />
-
-        <div className="mt-2">
-          <Button variant="outline" onClick={handleClearSearch}>
-            Clear Search
-          </Button>
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-1">Search</label>
+          <input
+            type="text"
+            className="border rounded px-2 py-1"
+            placeholder="Name or Email"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-      </div>
 
-      {/* CREATE NEW USER BUTTON */}
-      <div className="text-right">
-        <Button onClick={openCreateModal} variant="primary">
+        <Button variant="outline" onClick={handleClearSearch} className="mt-5">
+          Clear Search
+        </Button>
+
+        <div className="flex-1" />
+
+        <Button variant="primary" onClick={handleCreateUser} className="mt-5">
           + Create New User
         </Button>
       </div>
 
-      {/* USER LIST */}
-      <div className="space-y-4">
-        {users.map((u) => (
-          <div
-            key={u.id}
-            onClick={() => openEditModal(u)}
-            className="block bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">
+      {isLoading ? (
+        <p>Loading users...</p>
+      ) : isError ? (
+        <p className="text-red-600">Error loading users: {String(error)}</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {users.map((u) => (
+            <div
+              key={u.id}
+              className="p-4 bg-white rounded shadow hover:shadow-md cursor-pointer"
+              onClick={() => handleEditUser(u)}
+            >
+              <h2 className="font-semibold text-lg">
                 {u.firstName} {u.lastName}
-              </h3>
-              <span className="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+              </h2>
+              {u.email && <p className="text-gray-600 text-sm">{u.email}</p>}
+              {u.phone && <p className="text-sm text-gray-500">{u.phone}</p>}
+
+              {/* role badge */}
+              <span
+                className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full ${roleBadgeClass(u.role)}`}
+              >
                 {u.role}
               </span>
             </div>
-            {u.email && <p className="text-gray-600 text-sm mb-1">{u.email}</p>}
-            {u.phone && <p className="text-gray-500 text-sm mb-1">{u.phone}</p>}
-          </div>
-        ))}
-      </div>
-
-      {/* PAGINATION CONTROLS */}
-      <PaginationControls
-        currentPage={meta.currentPage}
-        totalPages={meta.totalPages}
-        onPageChange={setPage}
-        showGoTo
-        smooth
-      />
-
-      {isFetching && (
-        <div className="text-center text-sm text-gray-500 mt-2">
-          Loading...
+          ))}
         </div>
       )}
 
-      {/* CREATE/EDIT USER MODAL */}
-      <UserModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        existingUser={editingUser}
-        afterSave={() => refetch()}
-      />
+      {meta && (
+        <PaginationControls
+          currentPage={meta.currentPage}
+          totalPages={meta.totalPages}
+          onPageChange={setPage}
+          showGoTo
+          smooth
+        />
+      )}
+
+      {isFetching && <p className="text-sm text-gray-500">Updating...</p>}
+
+      {/* USER MODAL */}
+      {userModalOpen && (
+        <UserModal
+          isOpen={userModalOpen}
+          onClose={() => setUserModalOpen(false)}
+          existingUser={editingUser}
+          afterSave={() => {
+            // do nothing or refetch
+          }}
+        />
+      )}
     </div>
   );
 }

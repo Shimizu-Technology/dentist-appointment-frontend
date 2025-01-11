@@ -194,9 +194,18 @@ export async function deleteAppointmentType(id: number) {
 /** ----------------------------------------------------------------
  * DEPENDENTS
  * ----------------------------------------------------------------*/
+/**
+ * 1) getDependents => For the current user or for admin (depending on your controller logic).
+ *    GET /dependents
+ */
 export async function getDependents() {
   return api.get('/dependents');
 }
+
+/**
+ * 2) Normal user creating a dependent for themselves:
+ *    POST /dependents
+ */
 export async function createDependent(data: {
   firstName: string;
   lastName: string;
@@ -204,11 +213,39 @@ export async function createDependent(data: {
 }) {
   return api.post('/dependents', { dependent: data });
 }
+
+/**
+ * 3) Update an existing dependent
+ *    PATCH /dependents/:id
+ */
 export async function updateDependent(
   dependentId: number,
   data: { firstName: string; lastName: string; dateOfBirth: string }
 ) {
   return api.patch(`/dependents/${dependentId}`, { dependent: data });
+}
+
+/**
+ * 4) Admin scenario: create a dependent for a specific user
+ *    => POST /dependents?user_id=123
+ *    or if you route differently => /users/:user_id/dependents
+ *    Adjust this method accordingly:
+ */
+export async function createDependentForUser(
+  userId: number,
+  data: { firstName: string; lastName: string; dateOfBirth: string }
+) {
+  // We attach ?user_id= and call the same endpoint:
+  const params = { user_id: userId };
+  return api.post('/dependents', { dependent: data }, { params });
+}
+
+/**
+ * 5) Delete a dependent by ID
+ *    DELETE /dependents/:id
+ */
+export async function deleteDependent(dependentId: number) {
+  return api.delete(`/dependents/${dependentId}`);
 }
 
 /** ----------------------------------------------------------------
@@ -330,15 +367,8 @@ export async function getSchedules() {
  *     { day_of_week, is_open, open_time, close_time }, ...
  *   ]
  * }
- * OR for simpler usage, if you still want to pass older fields like:
- * { clinic_open_time, clinic_close_time, open_days }
- * that’s a different structure.
- *
- * Now that we have day-of-week settings, we usually pass
- * { clinic_day_settings: [ ... ] } in the request body.
  */
 export async function updateSchedules(data: any) {
-  // e.g. data = { clinic_day_settings: [ ... ] }
   return api.patch('/schedule', data);
 }
 
@@ -387,20 +417,12 @@ export async function uploadDentistImage(dentistId: number, file: File) {
  * APPOINTMENT REMINDERS (Admin-only)
  * ----------------------------------------------------------------*/
 
-/**
- * 1) Paginated + filtered reminders
- *    GET /api/v1/appointment_reminders
- *    e.g. /appointment_reminders?page=1&per_page=10&q=joe&status=queued&for_date=2025-01-12
- */
+/** GET /appointment_reminders (with filters) */
 export async function getReminders(params: Record<string, any>) {
   return api.get('/appointment_reminders', { params });
 }
 
-/**
- * 2) Update a reminder
- *    PATCH /api/v1/appointment_reminders/:id
- *    expects { appointment_reminder: { ... } }
- */
+/** PATCH /appointment_reminders/:id */
 export async function updateReminder(payload: {
   id: number;
   phone?: string;
