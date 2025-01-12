@@ -1,4 +1,5 @@
-import 'react-day-picker/dist/style.css'; // <--- Make sure to import DayPicker CSS
+// File: /src/pages/Appointments/New/components/DatePicker.tsx
+import 'react-day-picker/dist/style.css';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DayPicker } from 'react-day-picker';

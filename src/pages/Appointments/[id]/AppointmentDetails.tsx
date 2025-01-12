@@ -18,7 +18,7 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
   const isForDependent = !!appointment.dependent;
   const displayName = isForDependent
     ? `${appointment.dependent?.firstName} ${appointment.dependent?.lastName} (Dependent)`
-    : `${appointment.user?.firstName} ${appointment.user?.lastName} (You)`;
+    : `${appointment.user?.firstName} ${appointment.user?.lastName}`;
 
   let dateString = 'Invalid date';
   let timeString = '';

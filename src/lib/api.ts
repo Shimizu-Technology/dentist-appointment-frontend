@@ -3,19 +3,13 @@
 import axios from 'axios';
 import type { ClosedDay } from '../../types';
 
-/**
- * 1) Determine baseURL for API calls, based on environment.
- */
 const baseURL = import.meta.env.PROD
   ? import.meta.env.VITE_PROD_API_BASE_URL
   : import.meta.env.VITE_LOCAL_API_BASE_URL;
 
-// 2) Export the axios instance with attached baseURL
-export const api = axios.create({
-  baseURL,
-});
+export const api = axios.create({ baseURL });
 
-// Interceptor: attach JWT from localStorage if present
+// Attach token if present
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token && config.headers) {
@@ -24,7 +18,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/** Helper function for building absolute image URLs, if needed. */
+/** Build a full image URL if needed */
 export function buildFullImageUrl(imagePath?: string): string {
   if (!imagePath) return '';
   const trimmedBase = baseURL.replace(/\/$/, '');
@@ -36,39 +30,16 @@ export function buildFullImageUrl(imagePath?: string): string {
 }
 
 /** ----------------------------------------------------------------
- * DAY APPOINTMENTS
- * ----------------------------------------------------------------*/
-export async function getDayAppointments(
-  dentistId: number,
-  date: string,
-  ignoreId?: number
-) {
-  const params: any = { dentist_id: dentistId, date };
-  if (ignoreId) {
-    params.ignore_id = ignoreId;
-  }
-  return api.get('/appointments/day_appointments', { params });
-}
-
-/** ----------------------------------------------------------------
- * AUTH / SESSIONS
+ * AUTH
  * ----------------------------------------------------------------*/
 export async function login(email: string, password: string) {
   return api.post('/login', { email, password });
 }
 
-/** 
- * Invitation finish:
- * PATCH /invitations/finish with { token, password }.
- */
 export async function finishInvitation(token: string, password: string) {
   return api.patch('/invitations/finish', { token, password });
 }
 
-/**
- * Self-signup => POST /signup
- * This is for a normal user creating their own account with a password.
- */
 export async function signup(
   email: string,
   password: string,
@@ -101,35 +72,23 @@ export async function updateCurrentUser(data: {
   return api.patch('/users/current', { user: data });
 }
 
-/** ----------------------------------------------------------------
- * DENTISTS
- * ----------------------------------------------------------------*/
-export async function getDentists() {
-  return api.get('/dentists');
-}
-export async function getDentistAvailability(dentistId: number) {
-  return api.get(`/dentists/${dentistId}/availabilities`);
-}
-export async function createDentist(data: {
-  first_name: string;
-  last_name: string;
-  specialty_id?: number | null;
-  qualifications?: string;
+export async function updateInsurance(insuranceData: {
+  providerName?: string;
+  policyNumber?: string;
+  planType?: string;
 }) {
-  return api.post('/dentists', { dentist: data });
-}
-export async function updateDentist(dentistId: number, data: any) {
-  return api.patch(`/dentists/${dentistId}`, { dentist: data });
-}
-export async function deleteDentist(dentistId: number) {
-  return api.delete(`/dentists/${dentistId}`);
+  return api.patch('/users/current', {
+    user: {
+      provider_name: insuranceData.providerName,
+      policy_number: insuranceData.policyNumber,
+      plan_type: insuranceData.planType,
+    },
+  });
 }
 
 /** ----------------------------------------------------------------
  * APPOINTMENTS
  * ----------------------------------------------------------------*/
-
-/** Fetch a paginated list of appointments (yours or all if admin). */
 export async function getAppointments(
   page?: number,
   perPage?: number,
@@ -137,27 +96,44 @@ export async function getAppointments(
   opts?: { onlyMine?: boolean }
 ) {
   const params: any = { page, per_page: perPage, dentist_id: dentistId };
-  if (opts?.onlyMine) {
-    params.user_id = 'me';
-  }
+  if (opts?.onlyMine) params.user_id = 'me';
   return api.get('/appointments', { params });
 }
 
-/** Fetch a single appointment by ID. */
 export async function getAppointment(appointmentId: number) {
   return api.get(`/appointments/${appointmentId}`);
 }
 
-export async function createAppointment(data: any) {
-  return api.post('/appointments', { appointment: data });
+export async function createAppointment(data: {
+  appointment_time: string;
+  dentist_id: number;
+  appointment_type_id: number;
+  notes?: string;
+  child_user_id?: number;
+}) {
+  return api.post('/appointments', {
+    appointment: {
+      appointment_time:    data.appointment_time,
+      dentist_id:          data.dentist_id,
+      appointment_type_id: data.appointment_type_id,
+      notes:               data.notes || '',
+      child_user_id:       data.child_user_id,
+    },
+  });
 }
 
-export async function updateAppointment(appointmentId: number, data: any) {
+export async function updateAppointment(appointmentId: number, data: Record<string, any>) {
   return api.patch(`/appointments/${appointmentId}`, { appointment: data });
 }
 
 export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
+}
+
+export async function getDayAppointments(dentistId: number, date: string, ignoreId?: number) {
+  const params: any = { dentist_id: dentistId, date };
+  if (ignoreId) params.ignore_id = ignoreId;
+  return api.get('/appointments/day_appointments', { params });
 }
 
 export async function getNextAvailable(params: {
@@ -174,6 +150,7 @@ export async function getNextAvailable(params: {
 export async function getAppointmentTypes() {
   return api.get('/appointment_types');
 }
+
 export async function createAppointmentType(data: {
   name: string;
   duration: number;
@@ -181,88 +158,143 @@ export async function createAppointmentType(data: {
 }) {
   return api.post('/appointment_types', { appointment_type: data });
 }
+
 export async function updateAppointmentType(
   id: number,
   data: { name: string; duration: number; description: string }
 ) {
   return api.patch(`/appointment_types/${id}`, { appointment_type: data });
 }
+
 export async function deleteAppointmentType(id: number) {
   return api.delete(`/appointment_types/${id}`);
 }
 
 /** ----------------------------------------------------------------
- * DEPENDENTS
+ * DENTISTS
  * ----------------------------------------------------------------*/
-/**
- * 1) getDependents => For the current user or for admin (depending on your controller logic).
- *    GET /dependents
- */
-export async function getDependents() {
-  return api.get('/dependents');
+export async function getDentists() {
+  return api.get('/dentists');
 }
 
-/**
- * 2) Normal user creating a dependent for themselves:
- *    POST /dependents
- */
-export async function createDependent(data: {
+export async function getDentistAvailability(dentistId: number) {
+  return api.get(`/dentists/${dentistId}/availabilities`);
+}
+
+export async function deleteDentist(dentistId: number) {
+  return api.delete(`/dentists/${dentistId}`);
+}
+
+export async function createDentist(data: {
+  first_name: string;
+  last_name: string;
+  specialty_id?: number | null;
+  qualifications?: string;
+}) {
+  return api.post('/dentists', { dentist: data });
+}
+
+export async function updateDentist(dentistId: number, data: any) {
+  return api.patch(`/dentists/${dentistId}`, { dentist: data });
+}
+
+export async function uploadDentistImage(dentistId: number, file: File) {
+  const formData = new FormData();
+  formData.append('image', file);
+  return api.post(`/dentists/${dentistId}/upload_image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+/** ----------------------------------------------------------------
+ * CHILD USERS (Normal user usage)
+ * ----------------------------------------------------------------*/
+
+// GET /users/my_children => current user's children
+export async function getMyChildren() {
+  return api.get('/users/my_children');
+}
+
+// POST /users/my_children => create child's user under me
+export async function createMyChildUser(data: {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
 }) {
-  return api.post('/dependents', { dependent: data });
+  return api.post('/users/my_children', {
+    user: {
+      first_name:   data.firstName,
+      last_name:    data.lastName,
+      date_of_birth: data.dateOfBirth
+    },
+  });
 }
 
-/**
- * 3) Update an existing dependent
- *    PATCH /dependents/:id
- */
-export async function updateDependent(
-  dependentId: number,
+// PATCH /users/my_children/:childId => update child
+export async function updateMyChildUser(
+  childId: number,
   data: { firstName: string; lastName: string; dateOfBirth: string }
 ) {
-  return api.patch(`/dependents/${dependentId}`, { dependent: data });
+  return api.patch(`/users/my_children/${childId}`, {
+    user: {
+      first_name:   data.firstName,
+      last_name:    data.lastName,
+      date_of_birth: data.dateOfBirth
+    },
+  });
 }
 
-/**
- * 4) Admin scenario: create a dependent for a specific user
- *    => POST /dependents?user_id=123
- *    or if you route differently => /users/:user_id/dependents
- *    Adjust this method accordingly:
- */
-export async function createDependentForUser(
-  userId: number,
-  data: { firstName: string; lastName: string; dateOfBirth: string }
-) {
-  // We attach ?user_id= and call the same endpoint:
-  const params = { user_id: userId };
-  return api.post('/dependents', { dependent: data }, { params });
-}
-
-/**
- * 5) Delete a dependent by ID
- *    DELETE /dependents/:id
- */
-export async function deleteDependent(dependentId: number) {
-  return api.delete(`/dependents/${dependentId}`);
+// DELETE /users/my_children/:childId => remove child
+export async function deleteMyChildUser(childId: number) {
+  return api.delete(`/users/my_children/${childId}`);
 }
 
 /** ----------------------------------------------------------------
- * INSURANCE (User updates)
+ * ADMIN: Manage child users via /api/v1/admin/children
  * ----------------------------------------------------------------*/
-export async function updateInsurance(insuranceData: {
-  providerName: string;
-  policyNumber: string;
-  planType: string;
-}) {
-  return api.patch('/users/current', {
+
+/**
+ * GET /api/v1/admin/children?parent_user_id=XX
+ */
+export async function getAdminChildren(parentUserId: number) {
+  return api.get('/admin/children', {
+    params: { parent_user_id: parentUserId },
+  });
+}
+
+// In your /src/lib/api.ts (admin section)
+
+// PATCH /api/v1/admin/children/:childId => update a child user
+export async function updateAdminChildUser(
+  childId: number,
+  payload: {
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+    parent_user_id?: number;
+    email?: string;
+    phone?: string;
+    role?: 'user' | 'admin' | 'phone_only';
+  }
+) {
+  return api.patch(`/admin/children/${childId}`, {
     user: {
-      provider_name: insuranceData.providerName,
-      policy_number: insuranceData.policyNumber,
-      plan_type: insuranceData.planType,
+      first_name:     payload.firstName,
+      last_name:      payload.lastName,
+      date_of_birth:  payload.dateOfBirth,
+      parent_user_id: payload.parent_user_id,
+      email:          payload.email,
+      phone:          payload.phone,
+      role:           payload.role
     },
   });
+}
+
+/**
+ * DELETE /api/v1/admin/children/:id => Remove a child user
+ */
+export async function deleteChildUser(childId: number) {
+  return api.delete(`/admin/children/${childId}`);
 }
 
 /** ----------------------------------------------------------------
@@ -271,16 +303,17 @@ export async function updateInsurance(insuranceData: {
 export async function getUsers(page = 1, perPage = 10) {
   return api.get('/users', { params: { page, per_page: perPage } });
 }
+
 export async function promoteUser(userId: number) {
   return api.patch(`/users/${userId}/promote`);
 }
+
 export async function searchUsers(query: string, page = 1, perPage = 10) {
   return api.get('/users/search', { params: { q: query, page, per_page: perPage } });
 }
 
 /**
- * For admin to create a new user (invitation-based or phone_only).
- * POST /users
+ * Admin: create a user (including child user if is_dependent + parent_user_id are set).
  */
 export async function createUser(payload: {
   firstName: string;
@@ -289,19 +322,26 @@ export async function createUser(payload: {
   phone?: string;
   password?: string;
   role: 'user' | 'admin' | 'phone_only';
+  is_dependent?: boolean;
+  parent_user_id?: number;
+  date_of_birth?: string;
 }) {
   return api.post('/users', {
     user: {
-      first_name: payload.firstName,
-      last_name: payload.lastName,
-      email: payload.email,
-      phone: payload.phone,
-      password: payload.password,
-      role: payload.role,
+      first_name:     payload.firstName,
+      last_name:      payload.lastName,
+      email:          payload.email,
+      phone:          payload.phone,
+      password:       payload.password,
+      role:           payload.role,
+      is_dependent:   payload.is_dependent,
+      parent_user_id: payload.parent_user_id,
+      date_of_birth:  payload.date_of_birth,
     },
   });
 }
 
+/** Admin: update any user */
 export async function updateUser(
   userId: number,
   payload: {
@@ -311,19 +351,26 @@ export async function updateUser(
     phone?: string;
     password?: string;
     role?: 'user' | 'admin' | 'phone_only';
+    is_dependent?: boolean;
+    parent_user_id?: number;
+    date_of_birth?: string;
   }
 ) {
   return api.patch(`/users/${userId}`, {
     user: {
-      first_name: payload.firstName,
-      last_name: payload.lastName,
-      email: payload.email,
-      phone: payload.phone,
-      password: payload.password,
-      role: payload.role,
+      first_name:     payload.firstName,
+      last_name:      payload.lastName,
+      email:          payload.email,
+      phone:          payload.phone,
+      password:       payload.password,
+      role:           payload.role,
+      is_dependent:   payload.is_dependent,
+      parent_user_id: payload.parent_user_id,
+      date_of_birth:  payload.date_of_birth,
     },
   });
 }
+
 export async function deleteUser(userId: number) {
   return api.delete(`/users/${userId}`);
 }
@@ -334,9 +381,11 @@ export async function deleteUser(userId: number) {
 export async function getClosedDays() {
   return api.get<ClosedDay[]>('/closed_days');
 }
+
 export async function createClosedDay(data: { date: string; reason?: string }) {
   return api.post('/closed_days', { closed_day: data });
 }
+
 export async function deleteClosedDay(id: number) {
   return api.delete(`/closed_days/${id}`);
 }
@@ -344,30 +393,10 @@ export async function deleteClosedDay(id: number) {
 /** ----------------------------------------------------------------
  * SCHEDULES (Admin-only)
  * ----------------------------------------------------------------*/
-
-/**
- * The updated `getSchedules()` endpoint returns:
- * {
- *   clinicDaySettings: [
- *     { id, dayOfWeek, isOpen, openTime, closeTime },
- *     ...
- *   ],
- *   closedDays: [...],
- *   dentistUnavailabilities: [...]
- * }
- */
 export async function getSchedules() {
   return api.get('/schedule');
 }
 
-/**
- * The updated `updateSchedules()` endpoint can accept:
- * {
- *   clinic_day_settings: [
- *     { day_of_week, is_open, open_time, close_time }, ...
- *   ]
- * }
- */
 export async function updateSchedules(data: any) {
   return api.patch('/schedule', data);
 }
@@ -377,52 +406,35 @@ export async function updateSchedules(data: any) {
  * ----------------------------------------------------------------*/
 export async function createDentistUnavailability(data: {
   dentist_id: number;
-  date: string;       // "YYYY-MM-DD"
-  start_time: string; // "HH:mm"
-  end_time: string;   // "HH:mm"
+  date: string;
+  start_time: string;
+  end_time: string;
 }) {
   return api.post('/dentist_unavailabilities', {
     dentist_unavailability: data,
   });
 }
+
 export async function updateDentistUnavailability(
   id: number,
-  data: {
-    date: string;
-    start_time: string;
-    end_time: string;
-  }
+  data: { date: string; start_time: string; end_time: string }
 ) {
   return api.patch(`/dentist_unavailabilities/${id}`, {
     dentist_unavailability: data,
   });
 }
+
 export async function deleteDentistUnavailability(id: number) {
   return api.delete(`/dentist_unavailabilities/${id}`);
 }
 
 /** ----------------------------------------------------------------
- * DENTIST IMAGE UPLOAD (Admin-only)
- * ----------------------------------------------------------------*/
-export async function uploadDentistImage(dentistId: number, file: File) {
-  const formData = new FormData();
-  formData.append('image', file);
-
-  return api.post(`/dentists/${dentistId}/upload_image`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-}
-
-/** ----------------------------------------------------------------
  * APPOINTMENT REMINDERS (Admin-only)
  * ----------------------------------------------------------------*/
-
-/** GET /appointment_reminders (with filters) */
 export async function getReminders(params: Record<string, any>) {
   return api.get('/appointment_reminders', { params });
 }
 
-/** PATCH /appointment_reminders/:id */
 export async function updateReminder(payload: {
   id: number;
   phone?: string;

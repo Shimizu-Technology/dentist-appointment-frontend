@@ -1,9 +1,8 @@
 // File: /src/types/index.ts
-
 export interface User {
   id: number;
-  email: string;
-  role: 'user' | 'admin';
+  email: string | null;
+  role: 'user' | 'admin' | 'phone_only';
   firstName: string;
   lastName: string;
   phone?: string;
@@ -12,16 +11,13 @@ export interface User {
     policyNumber: string;
     planType: string;
   };
-}
+  forcePasswordReset?: boolean;
+  invitationToken?: string;
 
-export interface Dependent {
-  id: number;
-  userId: number;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  createdAt: string;
-  updatedAt: string;
+  // Child user logic:
+  isDependent?: boolean;        // true if this is a child
+  parentUserId?: number | null; // references parent's ID
+  dateOfBirth?: string | null;  // child's DOB if is_dependent
 }
 
 export interface AppointmentType {
@@ -42,7 +38,7 @@ export interface Dentist {
 
 export interface Appointment {
   id: number;
-  userId: number;
+  userId: number;             
   dentistId: number;
   appointmentTypeId: number;
   appointmentTime: string;
@@ -50,30 +46,12 @@ export interface Appointment {
   createdAt: string;
   updatedAt: string;
   notes?: string;
+  checkedIn: boolean;
+
+  childUserId?: number;       
+  childUser?: User;           // If the appointment is for a child
 
   user?: User;
-  dependentId?: number;
-  dependent?: Dependent;
-
-  userName?: string;
-  userEmail?: string;
-
   dentist?: Dentist;
   appointmentType?: AppointmentType;
-}
-
-export interface ClosedDay {
-  id: number;
-  date: string;       // e.g. "2025-12-25"
-  reason?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface DentistUnavailability {
-  id: number;
-  dentistId: number;
-  date: string;       // "YYYY-MM-DD"
-  startTime: string;  // "HH:mm"
-  endTime: string;    // "HH:mm"
 }

@@ -1,4 +1,5 @@
 // File: /src/pages/Profile/EditProfileModal.tsx
+
 import { X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import Button from '../../components/UI/Button';
@@ -18,6 +19,8 @@ interface ProfileFormData {
   lastName: string;
   email: string;
   phone?: string;
+  // If you want date of birth for main user:
+  // dateOfBirth?: string;
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
@@ -35,6 +38,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       lastName: user?.lastName || '',
       email: user?.email || '',
       phone: user?.phone || '',
+      // dateOfBirth: user?.dateOfBirth || '', // If you want to show it
     },
   });
 
@@ -45,6 +49,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
         last_name: data.lastName,
         email: data.email,
         phone: data.phone,
+        // date_of_birth: data.dateOfBirth, // if you have that
       };
       return updateCurrentUser(payload);
     },
@@ -67,7 +72,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center 
+                    justify-center p-4 z-50"
+    >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b">
@@ -121,6 +128,14 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             })}
             error={errors.phone?.message}
           />
+
+          {/* If you want a DOB field for the main user: */}
+          {/* <Input
+            label="Date of Birth"
+            type="date"
+            {...register('dateOfBirth')}
+            error={errors.dateOfBirth?.message}
+          /> */}
 
           <div className="flex justify-end space-x-4 pt-4">
             <Button

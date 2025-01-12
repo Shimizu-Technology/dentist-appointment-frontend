@@ -1,5 +1,4 @@
 // File: /src/pages/Admin/Dashboard/UserModal.tsx
-
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X } from 'lucide-react';
@@ -7,7 +6,6 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  createDependent,
 } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
@@ -39,20 +37,18 @@ export default function UserModal({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
 
-  // Dependent logic
+  // “Dependent” logic for a brand-new user
   const [isDependent, setIsDependent] = useState(false);
   const [parentUserId, setParentUserId] = useState<number | null>(null);
   const [parentSelectOpen, setParentSelectOpen] = useState(false);
 
-  // For “Manage Dependents” if editing
+  // Manage Dependents button if editing
   const [dependentsModalOpen, setDependentsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-
     if (existingUser) {
-      // editing
-      setRole(existingUser.role as 'user' | 'admin' | 'phone_only');
+      setRole(existingUser.role);
       setFirstName(existingUser.firstName);
       setLastName(existingUser.lastName);
       setPhone(existingUser.phone || '');
@@ -60,7 +56,6 @@ export default function UserModal({
       setIsDependent(false);
       setParentUserId(null);
     } else {
-      // new user
       setRole('user');
       setFirstName('');
       setLastName('');
@@ -72,7 +67,6 @@ export default function UserModal({
   }, [isOpen, existingUser]);
 
   async function handleSave() {
-    // validations
     if (!firstName.trim()) {
       toast.error('First name is required.');
       return;
@@ -85,7 +79,6 @@ export default function UserModal({
       toast.error('Phone is required.');
       return;
     }
-
     if (!isDependent && role !== 'phone_only' && !email.trim()) {
       toast.error('Email is required for non-phone_only users.');
       return;
@@ -93,7 +86,6 @@ export default function UserModal({
 
     try {
       if (isEditing && existingUser) {
-        // update
         await updateUser(existingUser.id, {
           role,
           firstName,
@@ -103,24 +95,23 @@ export default function UserModal({
         });
         toast.success('User updated!');
       } else {
-        // create
+        // create new user
         if (isDependent) {
           if (!parentUserId) {
             toast.error('Please select a parent user for this dependent.');
             return;
           }
-          // create dependent
-          await createDependent(
-            {
-              firstName,
-              lastName,
-              dateOfBirth: '2020-01-01', // or prompt for DOB
-            },
-            parentUserId
-          );
-          toast.success('Dependent created!');
+          await createUser({
+            role: 'phone_only',
+            firstName,
+            lastName,
+            phone,
+            email: '',
+            is_dependent: true,
+            parent_user_id: parentUserId,
+          });
+          toast.success('Dependent (child user) created!');
         } else {
-          // normal user
           await createUser({
             role,
             firstName,
@@ -133,7 +124,7 @@ export default function UserModal({
       }
 
       queryClient.invalidateQueries(['admin-users']);
-      queryClient.invalidateQueries(['users']); // or other keys
+      queryClient.invalidateQueries(['users']);
       onClose();
       afterSave?.();
     } catch (err: any) {
@@ -162,29 +153,13 @@ export default function UserModal({
     <Transition show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
         {/* Overlay */}
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-200"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-150"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
+        <Transition.Child as={Fragment}>
           <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
         </Transition.Child>
 
         {/* Panel */}
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-200"
-            enterFrom="opacity-0 translate-y-4 scale-95"
-            enterTo="opacity-100 translate-y-0 scale-100"
-            leave="ease-in duration-150"
-            leaveFrom="opacity-100 translate-y-0 scale-100"
-            leaveTo="opacity-0 translate-y-4 scale-95"
-          >
+          <Transition.Child as={Fragment}>
             <Dialog.Panel className="mx-auto w-full max-w-lg rounded-md bg-white shadow-lg">
               {/* Header */}
               <div className="flex justify-between items-center p-4 border-b">
@@ -198,7 +173,6 @@ export default function UserModal({
 
               {/* Body */}
               <div className="p-4 space-y-4">
-                {/* If editing => Manage Dependents button */}
                 {isEditing && (
                   <div className="text-right">
                     <Button
@@ -210,7 +184,6 @@ export default function UserModal({
                   </div>
                 )}
 
-                {/* Dependent Toggle => only if NOT editing */}
                 {!isEditing && (
                   <label className="flex items-center space-x-2">
                     <input
@@ -225,7 +198,6 @@ export default function UserModal({
                   </label>
                 )}
 
-                {/* Role => hidden if isDependent */}
                 {!isDependent && (
                   <div>
                     <label className="block text-sm font-medium mb-1">
@@ -245,7 +217,6 @@ export default function UserModal({
                   </div>
                 )}
 
-                {/* First/Last Name */}
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="First Name"
@@ -261,7 +232,6 @@ export default function UserModal({
                   />
                 </div>
 
-                {/* Phone */}
                 <Input
                   label="Phone (required)"
                   value={phone}
@@ -269,7 +239,6 @@ export default function UserModal({
                   required
                 />
 
-                {/* Email => only if not dependent + not phone_only */}
                 {!isDependent && role !== 'phone_only' && (
                   <Input
                     label="Email"
@@ -279,7 +248,6 @@ export default function UserModal({
                   />
                 )}
 
-                {/* If isDependent => pick parent */}
                 {isDependent && (
                   <div className="space-y-2">
                     <p className="text-sm text-gray-700">Select Parent User</p>
@@ -310,7 +278,7 @@ export default function UserModal({
                 </Button>
               </div>
 
-              {/* Submodal: ParentSelect */}
+              {/* ParentSelectModal */}
               {parentSelectOpen && (
                 <ParentSelectModal
                   isOpen={parentSelectOpen}
@@ -322,7 +290,7 @@ export default function UserModal({
                 />
               )}
 
-              {/* Submodal: Manage Dependents */}
+              {/* Manage Dependents */}
               {dependentsModalOpen && existingUser && (
                 <UserDependentsModal
                   isOpen={dependentsModalOpen}
