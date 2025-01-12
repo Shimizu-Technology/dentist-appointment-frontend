@@ -14,7 +14,6 @@ interface AppointmentDetailsProps {
 export default function AppointmentDetails({ appointment }: AppointmentDetailsProps) {
   const navigate = useNavigate();
 
-  // Check if for dependent or main user
   const isForDependent = !!appointment.dependent;
   const displayName = isForDependent
     ? `${appointment.dependent?.firstName} ${appointment.dependent?.lastName} (Dependent)`
@@ -29,14 +28,14 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
       timeString = format(d, 'h:mm a');
     }
   } catch {
-    /* no-op */
+    // no-op
   }
 
   const handleEdit = () => {
     navigate(`/appointments/${appointment.id}/edit`);
   };
 
-  // For a simple color-coded status badge
+  // Simple color-coded status badge
   const statusColors: Record<string, string> = {
     scheduled: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
@@ -44,101 +43,121 @@ export default function AppointmentDetails({ appointment }: AppointmentDetailsPr
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-8">
-      {/* Top row: status & reschedule/cancel actions (if allowed) */}
-      <div className="flex items-center justify-between mb-6">
-        <span
-          className={[
-            'px-3 py-1 rounded-full text-sm font-medium',
-            statusColors[appointment.status] || '',
-          ].join(' ')}
-        >
-          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-        </span>
-        {/* Show actions if the user can manage this appointment */}
+    <div className="bg-white rounded-md shadow-md p-4 sm:p-6 lg:p-8">
+      {/* Top row: status + any user-manageable actions */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
+        <div>
+          <span
+            className={[
+              'inline-block px-3 py-1 rounded-full text-sm font-medium',
+              statusColors[appointment.status] || 'bg-gray-100 text-gray-800',
+            ].join(' ')}
+          >
+            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+          </span>
+        </div>
         {canManageAppointment(appointment) && (
-          <AppointmentActions appointment={appointment} onEdit={handleEdit} />
+          <div className="flex gap-2">
+            <AppointmentActions appointment={appointment} onEdit={handleEdit} />
+          </div>
         )}
       </div>
 
       {/* Appointment For */}
-      <div className="flex items-start mb-4">
-        <User className="w-6 h-6 text-blue-600 mt-1 mr-4" />
-        <div>
-          <h3 className="font-medium text-gray-900">Appointment For</h3>
-          <p className="text-gray-600 mt-1">{displayName}</p>
-        </div>
-      </div>
+      <DetailRow
+        icon={<User className="w-5 h-5 text-blue-600" />}
+        title="Appointment For"
+        content={displayName}
+      />
 
       {/* Date */}
-      <div className="flex items-start mb-4">
-        <Calendar className="w-6 h-6 text-blue-600 mt-1 mr-4" />
-        <div>
-          <h3 className="font-medium text-gray-900">Date</h3>
-          <p className="text-gray-600 mt-1">{dateString}</p>
-        </div>
-      </div>
+      <DetailRow
+        icon={<Calendar className="w-5 h-5 text-blue-600" />}
+        title="Date"
+        content={dateString}
+      />
 
       {/* Time */}
-      <div className="flex items-start mb-4">
-        <Clock className="w-6 h-6 text-blue-600 mt-1 mr-4" />
-        <div>
-          <h3 className="font-medium text-gray-900">Time</h3>
-          <p className="text-gray-600 mt-1">{timeString}</p>
-        </div>
-      </div>
+      <DetailRow
+        icon={<Clock className="w-5 h-5 text-blue-600" />}
+        title="Time"
+        content={timeString}
+      />
 
       {/* Dentist */}
-      <div className="flex items-start mb-4">
-        <User className="w-6 h-6 text-blue-600 mt-1 mr-4" />
-        <div>
-          <h3 className="font-medium text-gray-900">Dentist</h3>
-          {appointment.dentist && (
+      <DetailRow
+        icon={<User className="w-5 h-5 text-blue-600" />}
+        title="Dentist"
+        content={
+          appointment.dentist ? (
             <>
-              <p className="text-gray-600 mt-1">
+              <p>
                 Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}
               </p>
-              <p className="text-gray-500 text-sm">
+              <p className="text-sm text-gray-500">
                 {appointment.dentist.specialty === 'pediatric'
                   ? 'Pediatric Dentist'
                   : 'General Dentist'}
               </p>
             </>
-          )}
-        </div>
-      </div>
+          ) : (
+            'N/A'
+          )
+        }
+      />
 
       {/* Appointment Type */}
-      <div className="flex items-start mb-4">
-        <FileText className="w-6 h-6 text-blue-600 mt-1 mr-4" />
-        <div>
-          <h3 className="font-medium text-gray-900">Appointment Type</h3>
-          {appointment.appointmentType ? (
+      <DetailRow
+        icon={<FileText className="w-5 h-5 text-blue-600" />}
+        title="Appointment Type"
+        content={
+          appointment.appointmentType ? (
             <>
-              <p className="text-gray-600 mt-1">{appointment.appointmentType.name}</p>
+              <p>{appointment.appointmentType.name}</p>
               {appointment.appointmentType.duration && (
-                <p className="text-gray-500 text-sm">
+                <p className="text-sm text-gray-500">
                   Duration: {appointment.appointmentType.duration} minutes
                 </p>
               )}
             </>
           ) : (
-            <p className="text-gray-600 mt-1">N/A</p>
-          )}
-        </div>
-      </div>
+            'N/A'
+          )
+        }
+      />
 
       {/* Notes */}
-      <div className="flex items-start mb-4">
-        <StickyNote className="w-6 h-6 text-blue-600 mt-1 mr-4" />
-        <div>
-          <h3 className="font-medium text-gray-900">Notes</h3>
-          <p className="text-gray-600 mt-1">
-            {appointment.notes && appointment.notes.trim().length > 0
-              ? appointment.notes
-              : 'No notes provided.'}
-          </p>
-        </div>
+      <DetailRow
+        icon={<StickyNote className="w-5 h-5 text-blue-600" />}
+        title="Notes"
+        content={
+          appointment.notes && appointment.notes.trim().length > 0
+            ? appointment.notes
+            : 'No notes provided.'
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * Small helper component to reduce repetition in the layout.
+ */
+function DetailRow({
+  icon,
+  title,
+  content,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  content: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 mb-4">
+      <div className="mt-1">{icon}</div>
+      <div>
+        <h3 className="font-medium text-gray-900 text-sm sm:text-base">{title}</h3>
+        <div className="text-gray-700 mt-1 text-sm sm:text-base">{content}</div>
       </div>
     </div>
   );

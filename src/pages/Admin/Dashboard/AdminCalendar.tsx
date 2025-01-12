@@ -51,17 +51,17 @@ export default function AdminCalendar() {
   // “Go to date” feature
   const [searchDate, setSearchDate] = useState('');
 
-  // Appointment modal states
+  // Appointment modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
-  // 1) Fetch schedule data (clinicDaySettings, closedDays, etc.)
+  // 1) Fetch schedules (clinicDaySettings + closedDays)
   const { data: scheduleData } = useQuery({
     queryKey: ['schedules'],
     queryFn: async () => {
       const res = await getSchedules();
-      return res.data;
+      return res.data; // => { clinicDaySettings, closedDays, ... }
     },
   });
 
@@ -69,7 +69,7 @@ export default function AdminCalendar() {
   const daySettings: ClinicDaySetting[] = scheduleData?.clinicDaySettings || [];
   const closedData: ClosedDay[] = scheduleData?.closedDays || [];
 
-  // 2) Dentists for the dropdown
+  // 2) Dentists for the filter
   const { data: dentistData = [] } = useQuery<Dentist[]>({
     queryKey: ['dentists'],
     queryFn: async () => {
@@ -78,35 +78,31 @@ export default function AdminCalendar() {
     },
   });
 
-  // 3) Appointments (fetch a large number, so we don’t miss any)
+  // 3) Large set of appointments for the calendar
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
-      // ADJUST PER-PAGE => 9999 or any large number
+      // fetch enough results so the calendar has everything it needs
       const response = await getAppointments(1, 9999, dentistIdNum);
       return response.data;
     },
   });
 
-  // Filter out canceled if you don’t want them shown
+  // Optionally exclude canceled appointments from the calendar
   let appointments = apptData?.appointments || [];
-  appointments = appointments.filter((appt) => appt.status !== 'cancelled');
+  appointments = appointments.filter((a) => a.status !== 'cancelled');
 
-  // Build the events array
+  // Build FullCalendar events from appointments
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    const dur = appt.appointmentType?.duration ?? 60;
+    const dur = appt.appointmentType?.duration ?? 60; // default 60-min
     const end = new Date(start.getTime() + dur * 60000);
 
-    // Default green for scheduled
-    let backgroundColor = '#86efac';
-    if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd';
-    }
-    if (appt.checkedIn) {
-      backgroundColor = '#fcd34d';
-    }
+    // Simple color logic
+    let backgroundColor = '#86efac'; // green
+    if (appt.status === 'completed') backgroundColor = '#93c5fd'; // light blue
+    if (appt.checkedIn) backgroundColor = '#fcd34d'; // yellow if checked in
 
     return {
       id: String(appt.id),
@@ -121,30 +117,29 @@ export default function AdminCalendar() {
     };
   });
 
-  // Map closedDays to background events
+  // Mark closed days as background events
   const closedEvents = closedData.map((cd) => ({
     start: cd.date,
     end: cd.date,
     allDay: true,
     display: 'background',
-    backgroundColor: '#d1d5db', // Gray
+    backgroundColor: '#d1d5db', // gray
     title: cd.reason || 'Closed Day',
     overlap: false,
   }));
 
-  // Merge them
   const allEvents = [...events, ...closedEvents];
 
-  // Convert clinicDaySettings => businessHours
+  // Convert daySettings => businessHours
   const businessHours = daySettings
     .filter((ds) => ds.isOpen)
     .map((ds) => ({
       daysOfWeek: [ds.dayOfWeek],
-      startTime: ds.openTime,
-      endTime: ds.closeTime,
+      startTime: ds.openTime,   // "09:00"
+      endTime: ds.closeTime,    // "17:00"
     }));
 
-  // FullCalendar handlers
+  // FULLCALENDAR handlers
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -158,7 +153,7 @@ export default function AdminCalendar() {
   }, []);
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
-    if (clickInfo.event.display === 'background') return;
+    if (clickInfo.event.display === 'background') return; // skip closed-day backgrounds
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
     if (appt) {
       setEditingAppointment(appt);
@@ -200,19 +195,11 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // Not supporting drag-resize for duration
+    // Not allowing drag-resize => revert
     resizeInfo.revert();
   }, []);
 
-  // If appointments failed to load
-  if (apptError) {
-    return (
-      <div className="text-red-600 p-4">
-        Failed to load appointments. Please try again later.
-      </div>
-    );
-  }
-
+  // "Go to date" logic
   function handleGoToDate(e: FormEvent) {
     e.preventDefault();
     if (!searchDate) return;
@@ -224,15 +211,27 @@ export default function AdminCalendar() {
     calendarRef.current?.getApi().gotoDate(parsed);
   }
 
+  // If the appointments fetch had an error
+  if (apptError) {
+    return (
+      <div className="text-red-600 p-4">
+        Failed to load appointments. Please try again later.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* TOP BAR: Dentist filter + "Go to date" */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        {/* Dentist filter */}
-        <div className="flex items-center gap-2">
-          <label className="font-medium text-gray-700">Filter by Dentist:</label>
+      {/* TOP CONTROLS: Filter + Go-to-date */}
+      <div className="bg-white p-4 rounded-md shadow space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+        {/* Dentist Filter */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <label className="font-medium text-gray-700 whitespace-nowrap">
+            Filter by Dentist:
+          </label>
           <select
-            className="border px-3 py-2 rounded"
+            className="border px-3 py-2 rounded text-sm w-full sm:w-auto
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={selectedDentistId}
             onChange={(e) => setSelectedDentistId(e.target.value)}
           >
@@ -245,75 +244,78 @@ export default function AdminCalendar() {
           </select>
         </div>
 
-        {/* Go to Date */}
-        <form onSubmit={handleGoToDate} className="flex items-center gap-2">
-          <label className="font-medium text-gray-700">Go to date:</label>
+        {/* Go-to-date Form */}
+        <form onSubmit={handleGoToDate} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <label className="font-medium text-gray-700 whitespace-nowrap">Go to date:</label>
           <input
             type="date"
-            className="border px-3 py-2 rounded"
+            className="border px-3 py-2 rounded text-sm w-full sm:w-auto
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={searchDate}
             onChange={(e) => setSearchDate(e.target.value)}
           />
-          <Button type="submit">Go</Button>
+          <Button type="submit" variant="primary" className="whitespace-nowrap">
+            Go
+          </Button>
         </form>
       </div>
 
       {/* LEGEND */}
-      <div className="flex items-center gap-6 flex-wrap text-sm mt-2">
+      <div className="bg-white p-4 rounded-md shadow flex flex-wrap items-center gap-4 text-sm">
         <div className="flex items-center gap-1">
-          <span
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: '#86efac' }}
-          />
-          Scheduled
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#86efac' }} />
+          <span>Scheduled</span>
         </div>
         <div className="flex items-center gap-1">
-          <span
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: '#93c5fd' }}
-          />
-          Completed
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#93c5fd' }} />
+          <span>Completed</span>
         </div>
         <div className="flex items-center gap-1">
-          <span
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: '#fcd34d' }}
-          />
-          Checked In
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#fcd34d' }} />
+          <span>Checked In</span>
         </div>
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-gray-300" />
-          Closed Day
+          <span>Closed Day</span>
         </div>
       </div>
 
-      <FullCalendar
-        ref={calendarRef}
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        selectable
-        select={handleSelect}
-        dateClick={handleDateClick}
-        eventClick={handleEventClick}
-        editable
-        eventDrop={handleEventDrop}
-        eventResize={handleEventResize}
-        slotMinTime="07:00:00"
-        slotMaxTime="19:00:00"
-        businessHours={businessHours}
-        slotDuration="00:15:00"
-        snapDuration="00:15:00"
-        displayEventTime
-        height="auto"
-        headerToolbar={{
-          left: 'prev,today,next',
-          center: 'title',
-          right: 'timeGridDay,timeGridWeek,dayGridMonth',
-        }}
-        events={allEvents}
-      />
+      {/* FULLCALENDAR CONTAINER */}
+      <div className="bg-white p-4 rounded-md shadow overflow-x-auto">
+        <div className="min-w-[320px]"> {/* Force at least 320px to avoid super-squished */}
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="timeGridWeek"
+            selectable
+            select={handleSelect}
+            dateClick={handleDateClick}
+            eventClick={handleEventClick}
+            editable
+            eventDrop={handleEventDrop}
+            eventResize={handleEventResize}
+            slotMinTime="07:00:00"
+            slotMaxTime="19:00:00"
+            businessHours={businessHours}
+            slotDuration="00:15:00"
+            snapDuration="00:15:00"
+            displayEventTime
+            // Let the calendar auto-size to content
+            height="auto"
+            // Make the toolbar a bit friendlier on smaller screens
+            headerToolbar={{
+              left: 'prev,today,next',
+              center: 'title',
+              right: 'timeGridDay,timeGridWeek,dayGridMonth',
+            }}
+            events={allEvents}
+            // Some folks also set eventDisplay="block" or "auto"
+            // or dayMaxEventRows = 3, etc. for a friendlier mobile month view.
+          />
+        </div>
+      </div>
 
-      {/* Create/Edit Appointment Modal */}
+      {/* CREATE/EDIT APPOINTMENT MODAL */}
       <AdminAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

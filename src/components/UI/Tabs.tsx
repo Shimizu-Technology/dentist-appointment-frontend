@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react';
+// File: /src/components/UI/Tabs.tsx
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  Dispatch,
+  SetStateAction,
+} from 'react';
 
 interface TabsContextValue {
   value: string;
@@ -12,6 +21,9 @@ interface TabsProps {
   children: ReactNode;
 }
 
+/**
+ * <Tabs> – The parent that manages which tab is active.
+ */
 export function Tabs({ defaultValue, children }: TabsProps) {
   const [value, setValue] = useState(defaultValue);
 
@@ -27,10 +39,19 @@ interface TabsListProps {
   className?: string;
 }
 
+/**
+ * <TabsList> – The container for all <TabsTrigger> elements.
+ * Wraps them with flex, gap, and possible border styling.
+ */
 export function TabsList({ children, className = '' }: TabsListProps) {
   return (
     <div
-      className={`flex space-x-1 border-b border-gray-200 mb-6 flex-wrap ${className}`}
+      className={`
+        flex flex-wrap gap-2
+        border-b border-gray-200
+        mb-6
+        ${className}
+      `}
     >
       {children}
     </div>
@@ -42,6 +63,9 @@ interface TabsTriggerProps {
   children: ReactNode;
 }
 
+/**
+ * <TabsTrigger> – A clickable button that activates a particular tab pane.
+ */
 export function TabsTrigger({ value, children }: TabsTriggerProps) {
   const ctx = useContext(TabsContext);
   if (!ctx) {
@@ -54,13 +78,18 @@ export function TabsTrigger({ value, children }: TabsTriggerProps) {
   return (
     <button
       onClick={() => setValue(value)}
+      aria-selected={isActive}
       className={`
-        px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2
-        focus:outline-none
+        px-3 py-2 text-sm font-medium
+        rounded-md
+        focus:outline-none focus:ring-2 focus:ring-blue-500
+        transition-colors
         ${
           isActive
-            ? 'text-gray-900 border-blue-500'
-            : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+            ? // Active (selected) tab styles
+              'bg-blue-100 text-blue-700'
+            : // Inactive (unselected) tab styles
+              'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
         }
       `}
     >
@@ -74,6 +103,9 @@ interface TabsContentProps {
   children: ReactNode;
 }
 
+/**
+ * <TabsContent> – Renders its children only if the active tab value matches `value`.
+ */
 export function TabsContent({ value, children }: TabsContentProps) {
   const ctx = useContext(TabsContext);
   if (!ctx) {
@@ -81,7 +113,6 @@ export function TabsContent({ value, children }: TabsContentProps) {
   }
 
   const { value: activeValue } = ctx;
-
   if (activeValue !== value) return null;
 
   return <div className="mt-4">{children}</div>;

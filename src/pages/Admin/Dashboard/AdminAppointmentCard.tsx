@@ -1,24 +1,44 @@
 // File: /src/pages/Admin/Dashboard/AdminAppointmentCard.tsx
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { Check, Edit2, X, CheckCircle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { cancelAppointment, updateAppointment } from '../../../lib/api';
-import Button from '../../../components/UI/Button';
+import {
+  cancelAppointment,
+  updateAppointment,
+} from '../../../lib/api';
 import type { Appointment } from '../../../types';
 import toast from 'react-hot-toast';
+
+// Your custom Button component (with variants, etc.)
+import Button from '../../../components/UI/Button';
+
+// Lucide or other icons
+import {
+  Check,         // Check In icon
+  CheckCircle,   // Complete icon
+  Edit3 as RescheduleIcon,  // "Reschedule" icon
+  XCircle,       // Cancel icon
+} from 'lucide-react';
+
 import AdminAppointmentModal from './AdminAppointmentModal';
 
 interface AdminAppointmentCardProps {
   appointment: Appointment;
 }
 
+/**
+ * A mobile-friendly Appointment Card with:
+ * - The user/dentist info
+ * - Responsive status + arrived badges
+ * - Wrap-friendly action buttons
+ * - Reschedule modal integration
+ */
 export default function AdminAppointmentCard({ appointment }: AdminAppointmentCardProps) {
   const queryClient = useQueryClient();
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Cancel
+  // ----- CANCEL -----
   const { mutate: handleCancel } = useMutation({
     mutationFn: () => cancelAppointment(appointment.id),
     onSuccess: () => {
@@ -30,7 +50,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
-  // Complete
+  // ----- COMPLETE -----
   const { mutate: handleComplete } = useMutation({
     mutationFn: () => updateAppointment(appointment.id, { status: 'completed' }),
     onSuccess: () => {
@@ -42,7 +62,7 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
-  // Toggle Check-In
+  // ----- CHECK-IN (TOGGLE) -----
   const { mutate: handleCheckInToggle, isLoading: isToggling } = useMutation({
     mutationFn: () => updateAppointment(appointment.id, {
       checked_in: !appointment.checkedIn,
@@ -56,127 +76,159 @@ export default function AdminAppointmentCard({ appointment }: AdminAppointmentCa
     },
   });
 
+  // Confirmations
   const onCancelClick = () => {
-    const yes = window.confirm('Cancel this appointment?');
-    if (!yes) return;
-    handleCancel();
+    if (window.confirm('Cancel this appointment?')) {
+      handleCancel();
+    }
   };
-
   const onCompleteClick = () => {
-    const yes = window.confirm('Mark as completed?');
-    if (!yes) return;
-    handleComplete();
+    if (window.confirm('Mark this appointment as completed?')) {
+      handleComplete();
+    }
   };
-
   const onCheckInClick = () => {
     const msg = appointment.checkedIn
       ? 'Un-check this patient? (Mark as not arrived?)'
       : 'Check in the patient (Mark as arrived)?';
-    if (!window.confirm(msg)) return;
-    handleCheckInToggle();
+    if (window.confirm(msg)) {
+      handleCheckInToggle();
+    }
   };
 
-  let startTime = '';
+  // Format the date/time
+  let formattedDate = '';
+  let formattedTime = '';
   try {
     const dt = new Date(appointment.appointmentTime);
-    startTime = format(dt, 'MMMM d, yyyy • h:mm a');
+    if (!isNaN(dt.getTime())) {
+      formattedDate = format(dt, 'MMMM d, yyyy');
+      formattedTime = format(dt, 'h:mm a');
+    }
   } catch {
     /* no-op */
   }
 
-  // Map statuses to color classes
-  const statusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  };
+  // Choose a color for the status badge
+  let statusClasses = 'bg-blue-100 text-blue-700'; // default: scheduled
+  if (appointment.status === 'completed') {
+    statusClasses = 'bg-green-100 text-green-700';
+  } else if (appointment.status === 'cancelled') {
+    statusClasses = 'bg-red-100 text-red-700';
+  }
+  // Past or other statuses can be handled if needed
 
-  // Status badge
-  const statusBadge = (
-    <span
-      className={
-        `px-2 py-1 text-xs rounded-full font-medium ` +
-        (statusColors[appointment.status] ?? 'bg-gray-100 text-gray-800')
-      }
-    >
-      {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-    </span>
-  );
-
-  // “Checked In” badge (if arrived)
+  // “Arrived” badge if checked_in
   const arrivedBadge = appointment.checkedIn && (
-    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 text-xs rounded-full font-medium">
+    <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">
       Arrived
     </span>
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-      {/* Title row */}
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold text-gray-900">
+    <div
+      className="bg-white rounded-md shadow p-4
+                 flex flex-col gap-3
+                 md:flex-row md:justify-between md:items-center"
+    >
+      {/* LEFT side: Appointment info */}
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold leading-snug">
           {appointment.appointmentType?.name || 'Appointment'}
-        </h3>
-        <div className="flex items-center space-x-2">
+        </h2>
+
+        <p className="text-sm text-gray-600">
+          Patient:{' '}
+          {appointment.user ? (
+            <>
+              {appointment.user.firstName} {appointment.user.lastName}
+              {appointment.user.email && (
+                <> (<span className="italic">{appointment.user.email}</span>)</>
+              )}
+            </>
+          ) : 'Unknown'}
+        </p>
+
+        <p className="text-sm text-gray-600">
+          Dentist:{' '}
+          {appointment.dentist
+            ? <>Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}</>
+            : 'N/A'}
+        </p>
+
+        {formattedDate && (
+          <p className="text-sm text-gray-600">
+            {formattedDate} &bull; {formattedTime}
+          </p>
+        )}
+      </div>
+
+      {/* RIGHT side: Status, Arrived, Buttons */}
+      <div className="flex flex-col items-start md:items-end gap-2">
+        {/* Badges row -> status + arrived */}
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={`inline-block px-2 py-1 text-sm font-semibold rounded-full ${statusClasses}`}
+          >
+            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+          </span>
           {arrivedBadge}
-          {statusBadge}
+        </div>
+
+        {/* Buttons row -> wraps on mobile */}
+        <div className="flex flex-wrap gap-2 text-sm">
+          {/* Check In button */}
+          {appointment.status === 'scheduled' && (
+            <Button
+              variant="warning"
+              onClick={onCheckInClick}
+              isLoading={isToggling}
+              className="flex items-center"
+            >
+              <Check className="w-4 h-4 mr-1" />
+              {appointment.checkedIn ? 'Un-Check' : 'Check In'}
+            </Button>
+          )}
+
+          {/* Reschedule => show modal */}
+          {appointment.status === 'scheduled' && (
+            <Button
+              variant="outline"
+              onClick={() => setShowEditModal(true)}
+              className="flex items-center"
+            >
+              <RescheduleIcon className="w-4 h-4 mr-1" />
+              Reschedule
+            </Button>
+          )}
+
+          {/* Cancel */}
+          {appointment.status === 'scheduled' && (
+            <Button
+              variant="danger"
+              onClick={onCancelClick}
+              className="flex items-center"
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              Cancel
+            </Button>
+          )}
+
+          {/* Complete */}
+          {appointment.status === 'scheduled' && (
+            <Button
+              variant="success"
+              onClick={onCompleteClick}
+              className="flex items-center"
+            >
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Complete
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Body */}
-      <div className="text-sm text-gray-600 mb-4">
-        {appointment.user && (
-          <p className="mb-1">
-            Patient: {appointment.user.firstName} {appointment.user.lastName} (
-            {appointment.user.email})
-          </p>
-        )}
-        {appointment.dentist && (
-          <p className="mb-1">Dentist: Dr. {appointment.dentist.firstName} {appointment.dentist.lastName}</p>
-        )}
-        <p>{startTime}</p>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Check In / Un-check In */}
-        {appointment.status === 'scheduled' && (
-          <Button
-            variant="warning"
-            onClick={onCheckInClick}
-            isLoading={isToggling}
-          >
-            <Check className="w-4 h-4 mr-1" />
-            {appointment.checkedIn ? 'Un-Check' : 'Check In'}
-          </Button>
-        )}
-
-        {/* Reschedule => open modal */}
-        {appointment.status === 'scheduled' && (
-          <Button variant="outline" onClick={() => setShowEditModal(true)}>
-            <Edit2 className="w-4 h-4 mr-1" />
-            Reschedule
-          </Button>
-        )}
-
-        {/* Cancel */}
-        {appointment.status === 'scheduled' && (
-          <Button variant="danger" onClick={onCancelClick}>
-            <X className="w-4 h-4 mr-1" />
-            Cancel
-          </Button>
-        )}
-
-        {/* Complete */}
-        {appointment.status === 'scheduled' && (
-          <Button variant="success" onClick={onCompleteClick}>
-            <CheckCircle className="w-4 h-4 mr-1" />
-            Complete
-          </Button>
-        )}
-      </div>
-
-      {/* Edit Appointment Modal */}
+      {/* Edit (Reschedule) modal */}
       {showEditModal && (
         <AdminAppointmentModal
           isOpen={showEditModal}

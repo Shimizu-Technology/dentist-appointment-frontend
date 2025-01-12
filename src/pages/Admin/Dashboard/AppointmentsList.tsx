@@ -1,4 +1,5 @@
 // File: /src/pages/Admin/Dashboard/AppointmentsList.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -19,7 +20,7 @@ interface PaginatedAppointments {
   };
 }
 
-/** 
+/**
  * Fetch appointments with optional filters:
  * - page
  * - status
@@ -47,10 +48,8 @@ async function fetchAppointments(
 export default function AppointmentsList() {
   // PAGINATION & FILTERS
   const [page, setPage] = useState(1);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
-
   const [selectedDentistId, setSelectedDentistId] = useState('');
   const [date, setDate] = useState('');
   const [status, setStatus] = useState('scheduled');
@@ -75,7 +74,7 @@ export default function AppointmentsList() {
     if (isSearchFocused) {
       searchRef.current?.focus();
     }
-  });
+  }, [isSearchFocused]);
 
   // Debounce searchTerm => debouncedTerm
   useEffect(() => {
@@ -85,7 +84,7 @@ export default function AppointmentsList() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // DENTISTS for the dropdown
+  // Fetch Dentists for the dropdown
   const {
     data: dentistList = [],
     isLoading: isDentistLoading,
@@ -119,10 +118,11 @@ export default function AppointmentsList() {
     keepPreviousData: true,
   });
 
+  // Loading / error states
   if (isLoading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full mx-auto"></div>
+        <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full mx-auto" />
       </div>
     );
   }
@@ -134,6 +134,7 @@ export default function AppointmentsList() {
     );
   }
 
+  // Extract response data
   const { appointments = [], meta = { currentPage: 1, totalPages: 1 } } = data || {};
 
   // Clear filters
@@ -149,10 +150,11 @@ export default function AppointmentsList() {
 
   return (
     <div className="space-y-6">
-      {/* FILTERS */}
+      {/* FILTERS PANEL */}
       <div className="bg-white p-6 rounded-md shadow-md space-y-4">
+        {/* Top row: search fields in a grid (stack on mobile) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search input */}
+          {/* Search */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Search
@@ -164,12 +166,13 @@ export default function AppointmentsList() {
               onChange={handleSearchChange}
               onFocus={handleSearchFocus}
               onBlur={handleSearchBlur}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Name, Email, or ID"
             />
           </div>
 
-          {/* Dentist dropdown */}
+          {/* Dentist */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Dentist
@@ -180,7 +183,8 @@ export default function AppointmentsList() {
                 setSelectedDentistId(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Dentists</option>
               {!isDentistLoading && dentistList.map((d) => (
@@ -203,7 +207,8 @@ export default function AppointmentsList() {
                 setDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -218,7 +223,8 @@ export default function AppointmentsList() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="scheduled">Scheduled</option>
               <option value="completed">Completed</option>
@@ -229,6 +235,7 @@ export default function AppointmentsList() {
           </div>
         </div>
 
+        {/* Clear Filters button */}
         <div className="text-right">
           <Button variant="outline" onClick={handleClearFilters}>
             Clear Filters
@@ -257,11 +264,13 @@ export default function AppointmentsList() {
             ))}
           </div>
         ) : (
-          <p className="text-center text-gray-500">No matching appointments found.</p>
+          <p className="text-center text-gray-500">
+            No matching appointments found.
+          </p>
         )}
       </div>
 
-      {/* PAGINATION CONTROLS (replaces old next/prev) */}
+      {/* PAGINATION */}
       <PaginationControls
         currentPage={meta.currentPage}
         totalPages={meta.totalPages}
@@ -276,7 +285,7 @@ export default function AppointmentsList() {
         </div>
       )}
 
-      {/* AdminAppointmentModal => create new */}
+      {/* CREATE Appointment Modal */}
       <AdminAppointmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

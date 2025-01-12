@@ -16,9 +16,11 @@ export default function AdminDashboard() {
       <DashboardHeader />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        {/* Container with white card */}
+        <div className="bg-white rounded-md shadow-md p-4 sm:p-6">
           <Tabs defaultValue="appointments">
-            <TabsList className="flex flex-wrap gap-2 justify-center md:justify-start">
+            {/* TabsList with improved styling and spacing. */}
+            <TabsList className="flex flex-wrap gap-2 justify-center md:justify-start mb-6 border-b border-gray-200">
               <TabsTrigger value="appointments">Appointments</TabsTrigger>
               <TabsTrigger value="calendar">Calendar</TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
@@ -28,25 +30,26 @@ export default function AdminDashboard() {
               <TabsTrigger value="reminders">Reminders</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="appointments">
+            {/* Each tab’s content can have consistent padding. */}
+            <TabsContent value="appointments" className="pt-4">
               <AppointmentsList />
             </TabsContent>
-            <TabsContent value="calendar">
+            <TabsContent value="calendar" className="pt-4">
               <AdminCalendar />
             </TabsContent>
-            <TabsContent value="users">
+            <TabsContent value="users" className="pt-4">
               <UsersList />
             </TabsContent>
-            <TabsContent value="appointment-types">
+            <TabsContent value="appointment-types" className="pt-4">
               <AppointmentTypes />
             </TabsContent>
-            <TabsContent value="schedules">
+            <TabsContent value="schedules" className="pt-4">
               <SchedulesList />
             </TabsContent>
-            <TabsContent value="dentists">
+            <TabsContent value="dentists" className="pt-4">
               <DentistsList />
             </TabsContent>
-            <TabsContent value="reminders">
+            <TabsContent value="reminders" className="pt-4">
               <RemindersList />
             </TabsContent>
           </Tabs>
