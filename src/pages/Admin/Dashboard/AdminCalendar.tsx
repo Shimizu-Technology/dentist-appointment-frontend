@@ -16,7 +16,7 @@ import interactionPlugin, {
 import {
   getAppointments,
   getDentists,
-  getSchedules, // <--- consolidated schedules call
+  getSchedules,
   updateAppointment,
 } from '../../../lib/api';
 import type { Appointment, Dentist, ClosedDay } from '../../../types';
@@ -38,30 +38,30 @@ interface ClinicDaySetting {
   id: number;
   dayOfWeek: number;  // 0=Sun..6=Sat
   isOpen: boolean;
-  openTime: string;   // "09:00"
-  closeTime: string;  // "17:00"
+  openTime: string;   // e.g. "09:00"
+  closeTime: string;  // e.g. "17:00"
 }
 
 export default function AdminCalendar() {
   const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
-  // Filtering by dentist
+  // Dentist filter
   const [selectedDentistId, setSelectedDentistId] = useState<string>('');
   // “Go to date” feature
   const [searchDate, setSearchDate] = useState('');
 
-  // For the appointment modal
+  // Appointment modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
-  // 1) Fetch the consolidated schedule data
+  // 1) Fetch schedule data (clinicDaySettings, closedDays, etc.)
   const { data: scheduleData } = useQuery({
     queryKey: ['schedules'],
     queryFn: async () => {
       const res = await getSchedules();
-      return res.data; // => { clinicDaySettings, closedDays, dentistUnavailabilities, etc. }
+      return res.data;
     },
   });
 
@@ -78,32 +78,34 @@ export default function AdminCalendar() {
     },
   });
 
-  // 3) Appointments
+  // 3) Appointments (fetch a large number, so we don’t miss any)
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
-      const response = await getAppointments(1, 300, dentistIdNum);
+      // ADJUST PER-PAGE => 9999 or any large number
+      const response = await getAppointments(1, 9999, dentistIdNum);
       return response.data;
     },
   });
 
-  // Filter out cancelled
+  // Filter out canceled if you don’t want them shown
   let appointments = apptData?.appointments || [];
   appointments = appointments.filter((appt) => appt.status !== 'cancelled');
 
-  // Build appointment events
+  // Build the events array
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
     const dur = appt.appointmentType?.duration ?? 60;
     const end = new Date(start.getTime() + dur * 60000);
 
-    let backgroundColor = '#86efac'; // default scheduled = green
+    // Default green for scheduled
+    let backgroundColor = '#86efac';
     if (appt.status === 'completed') {
-      backgroundColor = '#93c5fd'; // completed = light blue
+      backgroundColor = '#93c5fd';
     }
     if (appt.checkedIn) {
-      backgroundColor = '#fcd34d'; // checked in = yellow
+      backgroundColor = '#fcd34d';
     }
 
     return {
@@ -119,21 +121,21 @@ export default function AdminCalendar() {
     };
   });
 
-  // Closed days as background events
+  // Map closedDays to background events
   const closedEvents = closedData.map((cd) => ({
     start: cd.date,
     end: cd.date,
     allDay: true,
     display: 'background',
-    backgroundColor: '#d1d5db', // gray
+    backgroundColor: '#d1d5db', // Gray
     title: cd.reason || 'Closed Day',
     overlap: false,
   }));
 
-  // Combine them
+  // Merge them
   const allEvents = [...events, ...closedEvents];
 
-  // Convert clinicDaySettings => FullCalendar “businessHours”
+  // Convert clinicDaySettings => businessHours
   const businessHours = daySettings
     .filter((ds) => ds.isOpen)
     .map((ds) => ({
@@ -142,7 +144,7 @@ export default function AdminCalendar() {
       endTime: ds.closeTime,
     }));
 
-  // Event handlers
+  // FullCalendar handlers
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -198,10 +200,11 @@ export default function AdminCalendar() {
   );
 
   const handleEventResize = useCallback((resizeInfo: EventResizeDoneArg) => {
-    // Not supporting drag-resize to change durations
+    // Not supporting drag-resize for duration
     resizeInfo.revert();
   }, []);
 
+  // If appointments failed to load
   if (apptError) {
     return (
       <div className="text-red-600 p-4">
@@ -223,9 +226,9 @@ export default function AdminCalendar() {
 
   return (
     <div className="space-y-6">
-      {/* TOP BAR: Dentist filter, date search */}
+      {/* TOP BAR: Dentist filter + "Go to date" */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        {/* Dentist Filter */}
+        {/* Dentist filter */}
         <div className="flex items-center gap-2">
           <label className="font-medium text-gray-700">Filter by Dentist:</label>
           <select
@@ -242,7 +245,7 @@ export default function AdminCalendar() {
           </select>
         </div>
 
-        {/* “Go to Date” */}
+        {/* Go to Date */}
         <form onSubmit={handleGoToDate} className="flex items-center gap-2">
           <label className="font-medium text-gray-700">Go to date:</label>
           <input
@@ -258,15 +261,24 @@ export default function AdminCalendar() {
       {/* LEGEND */}
       <div className="flex items-center gap-6 flex-wrap text-sm mt-2">
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#86efac' }} />
+          <span
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: '#86efac' }}
+          />
           Scheduled
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#93c5fd' }} />
+          <span
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: '#93c5fd' }}
+          />
           Completed
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#fcd34d' }} />
+          <span
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: '#fcd34d' }}
+          />
           Checked In
         </div>
         <div className="flex items-center gap-1">
@@ -286,12 +298,9 @@ export default function AdminCalendar() {
         editable
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        // Only show 7am to 7pm
         slotMinTime="07:00:00"
         slotMaxTime="19:00:00"
-        // Business hours from daySettings
         businessHours={businessHours}
-        // Snap to 15-min increments
         slotDuration="00:15:00"
         snapDuration="00:15:00"
         displayEventTime
