@@ -6,11 +6,13 @@ import { searchUsers } from '../../../lib/api';
 import { useQuery } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
 import toast from 'react-hot-toast';
+import type { User } from '../../../types';
 
 interface ParentSelectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectParent: (parentUserId: number) => void;
+  // Instead of just passing back an ID, we'll pass the *whole* user object
+  onSelectParent: (parentUser: User) => void;
 }
 
 export default function ParentSelectModal({
@@ -19,27 +21,32 @@ export default function ParentSelectModal({
   onSelectParent,
 }: ParentSelectModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [debounced, setDebounced] = useState('');
+  const [debounced, setDebounced]   = useState('');
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(searchTerm.trim()), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
+  // Query for users based on the search
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['parent-user-search', debounced],
     queryFn: async () => {
-      if (!debounced) return { users: [], meta: {} };
+      if (!debounced) {
+        return { users: [], meta: {} };
+      }
       const res = await searchUsers(debounced, 1, 10);
-      return res.data; // { users, meta }
+      return res.data; // shape: { users, meta }
     },
     enabled: isOpen && debounced.length > 0,
   });
 
-  const users = data?.users || [];
+  const users: User[] = data?.users || [];
 
-  function handleSelect(u: any) {
-    onSelectParent(u.id);
+  function handleSelect(u: User) {
+    // We pass the entire user object back to onSelectParent
+    console.log('[ParentSelectModal] handleSelect => user:', u);
+    onSelectParent(u);
   }
 
   return (
@@ -74,17 +81,20 @@ export default function ParentSelectModal({
                 <p className="text-sm text-red-600">Error: {String(error)}</p>
               )}
 
+              {/* RESULTS LIST */}
               <ul className="max-h-40 overflow-auto border rounded divide-y text-sm">
-                {users.map((u: any) => (
+                {users.map((user) => (
                   <li
-                    key={u.id}
+                    key={user.id}
                     className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
-                    onClick={() => handleSelect(u)}
+                    onClick={() => handleSelect(user)}
                   >
                     <strong>
-                      {u.firstName} {u.lastName}
+                      {user.firstName} {user.lastName}
                     </strong>{' '}
-                    <span className="text-gray-600 ml-1">({u.email})</span>
+                    {user.email && (
+                      <span className="text-gray-600 ml-1">({user.email})</span>
+                    )}
                   </li>
                 ))}
                 {!isLoading && users.length === 0 && (
@@ -92,7 +102,7 @@ export default function ParentSelectModal({
                 )}
               </ul>
 
-              <div className="text-right mt-3">
+              <div className="text-right mt-4">
                 <Button variant="secondary" onClick={onClose}>
                   Close
                 </Button>
