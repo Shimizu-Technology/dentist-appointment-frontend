@@ -77,25 +77,25 @@ export default function AdminCalendar() {
     },
   });
 
-  // 3) Fetch a large set of appointments for the calendar
+  // 3) Fetch appointments for the calendar
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
-      // fetch a high limit so the calendar has everything it needs
+      // fetch a high limit so the calendar has everything
       const response = await getAppointments(1, 9999, dentistIdNum);
       return response.data;
     },
   });
 
-  // Filter out cancelled appointments
+  // Filter out canceled appointments
   let appointments = apptData?.appointments || [];
   appointments = appointments.filter((a) => a.status !== 'cancelled');
 
-  // Build FullCalendar events from appointments
+  // Build FullCalendar events
   const events = appointments.map((appt) => {
     const start = new Date(appt.appointmentTime);
-    const dur = appt.appointmentType?.duration ?? 60; // default 60-min
+    const dur = appt.appointmentType?.duration ?? 60; // default 60 minutes
     const end = new Date(start.getTime() + dur * 60000);
 
     // Simple color logic
@@ -103,13 +103,12 @@ export default function AdminCalendar() {
     if (appt.status === 'completed') backgroundColor = '#93c5fd'; // light blue
     if (appt.checkedIn) backgroundColor = '#fcd34d'; // yellow if checked in
 
-    // Show who it's for in the 'title'
+    // Show who the appointment is for
     const patientName = appt.user
       ? `${appt.user.firstName} ${appt.user.lastName}`
       : 'Unknown';
 
     // Example: "Jane Doe (#123)" or "Jane Doe (Cleaning #123)"
-    // Your choice how you want to format it:
     const displayedTitle = appt.appointmentType
       ? `${patientName} (${appt.appointmentType.name} #${appt.id})`
       : `${patientName} (#${appt.id})`;
@@ -148,7 +147,6 @@ export default function AdminCalendar() {
     }));
 
   // =============== FULLCALENDAR HANDLERS ===============
-
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -208,21 +206,18 @@ export default function AdminCalendar() {
     resizeInfo.revert();
   }, []);
 
-  // Show a tooltip on hover (fix text being cut off + extra info)
+  // Show a tooltip on hover + fix text overflow
   const handleEventMount = useCallback((mountInfo: EventMountArg) => {
-    // “mountInfo.el” is the rendered element
-    // “mountInfo.event.extendedProps.appointment” is our object
     const appt = mountInfo.event.extendedProps.appointment as Appointment;
     if (!appt) return;
 
-    // For a simple native tooltip, set the "title" attribute:
     const patientName = appt.user
       ? `${appt.user.firstName} ${appt.user.lastName}`
       : 'Unknown User';
     const typeName = appt.appointmentType?.name || 'Appointment';
     mountInfo.el.title = `${patientName}\n${typeName} (#${appt.id})`;
-    // This line ensures the text in the event doesn’t overflow
-    // by making it display as a block with normal wrapping:
+
+    // Let text wrap
     mountInfo.el.style.whiteSpace = 'normal';
   }, []);
 
@@ -343,6 +338,8 @@ export default function AdminCalendar() {
             eventDisplay="block"
             // Hook to add a tooltip and fix overflow
             eventDidMount={handleEventMount}
+            // for current time indicator:
+            nowIndicator
           />
         </div>
       </div>
