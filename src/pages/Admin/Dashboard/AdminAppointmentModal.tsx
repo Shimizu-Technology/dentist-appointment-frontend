@@ -20,6 +20,9 @@ import UserSearchSelect from './UserSearchSelect';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+// --------------------------------
+// Type definitions
+// --------------------------------
 interface Appointment {
   id: number;
   appointmentTime: string; // e.g. "2025-01-08T12:45:00Z"
@@ -53,6 +56,9 @@ interface FormData {
   checked_in?: boolean;
 }
 
+// --------------------------------
+// Component
+// --------------------------------
 export default function AdminAppointmentModal({
   isOpen,
   onClose,
@@ -63,9 +69,10 @@ export default function AdminAppointmentModal({
   const queryClient = useQueryClient();
   const isEditing = !!editingAppointment;
 
-  // We store the selected user id if creating a new appointment.
+  // For a brand-new appointment, we store which user the admin picked in the user search.
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
+  // React-Hook-Form setup
   const methods = useForm<FormData>({
     mode: 'onChange',
   });
@@ -76,31 +83,30 @@ export default function AdminAppointmentModal({
     formState: { isSubmitting, isValid },
   } = methods;
 
-  // If editing => show a "Currently scheduled" line
+  // If we’re editing an existing appointment => show a “Currently scheduled” line
   let originalTimeString = '';
   if (isEditing && editingAppointment) {
     const oldDateObj = new Date(editingAppointment.appointmentTime);
     originalTimeString = format(oldDateObj, 'MMMM d, yyyy h:mm aa');
   }
 
-  // Whenever the modal opens or `editingAppointment` changes, reset the form
+  // --------------------------------
+  // Effects: initialize or reset the form
+  // --------------------------------
   useEffect(() => {
     if (!isOpen) return;
 
     if (editingAppointment) {
-      // Parse existing date/time => "YYYY-MM-DD" and "HH:mm"
+      // We are editing => parse existing appointment’s date/time
       const dt = new Date(editingAppointment.appointmentTime);
       const isValidDate = !isNaN(dt.getTime());
-
-      const dateStr = isValidDate
-        ? dt.toISOString().split('T')[0] // e.g. "2025-01-08"
-        : '';
+      const dateStr = isValidDate ? dt.toISOString().split('T')[0] : '';
       const hh = dt.getHours().toString().padStart(2, '0');
       const mm = dt.getMinutes().toString().padStart(2, '0');
       const timeStr = isValidDate ? `${hh}:${mm}` : '';
 
       reset({
-        user_id: '', // Not used when editing
+        user_id: '', // Not used while editing
         dentist_id: String(editingAppointment.dentistId),
         appointment_type_id: String(editingAppointment.appointmentTypeId),
         appointment_date: dateStr,
@@ -110,9 +116,9 @@ export default function AdminAppointmentModal({
       });
       setSelectedUserId(null);
     } else {
-      // Creating new
+      // Creating new => supply defaults
       const baseDateObj = defaultDate ?? new Date();
-      const baseDateStr = baseDateObj.toISOString().split('T')[0]; // "YYYY-MM-DD"
+      const baseDateStr = baseDateObj.toISOString().split('T')[0]; // e.g. "YYYY-MM-DD"
 
       reset({
         user_id: '',
@@ -127,11 +133,15 @@ export default function AdminAppointmentModal({
     }
   }, [isOpen, editingAppointment, defaultDate, defaultDentistId, reset]);
 
-  // CREATE or UPDATE
+  // --------------------------------
+  // CREATE or UPDATE mutation
+  // --------------------------------
   const { mutateAsync: mutateAppointment } = useMutation({
     mutationFn: async (data: FormData) => {
-      // Convert date + time => ISO
+      // Convert date + time => an ISO string
       const isoString = buildIsoString(data.appointment_date, data.appointment_time);
+
+      // Build the common payload
       const payload: Record<string, any> = {
         appointment_time: isoString,
         dentist_id: parseInt(data.dentist_id, 10),
@@ -140,20 +150,24 @@ export default function AdminAppointmentModal({
         checked_in: !!data.checked_in,
       };
 
-      // If creating new, we need user_id
+      // If creating new => we can pass a user_id
       if (!isEditing && data.user_id) {
         payload.user_id = parseInt(data.user_id, 10);
       }
+
       if (isEditing && editingAppointment) {
+        // We are updating an existing appointment
         return updateAppointment(editingAppointment.id, payload);
       } else {
+        // We are creating a new appointment
         return createAppointment(payload);
       }
     },
     onSuccess: () => {
-      // Re-fetch relevant queries
+      // Refresh relevant admin queries
       queryClient.invalidateQueries(['admin-appointments']);
       queryClient.invalidateQueries(['admin-appointments-for-calendar']);
+
       toast.success(isEditing ? 'Appointment updated!' : 'Appointment created!');
       onClose();
     },
@@ -162,7 +176,9 @@ export default function AdminAppointmentModal({
     },
   });
 
-  // CANCEL (delete) if editing
+  // --------------------------------
+  // CANCEL (delete) mutation if editing
+  // --------------------------------
   const { mutateAsync: deleteAppointmentMut } = useMutation({
     mutationFn: async () => {
       if (!editingAppointment) throw new Error('No appointment to delete');
@@ -179,6 +195,9 @@ export default function AdminAppointmentModal({
     },
   });
 
+  // --------------------------------
+  // Handlers
+  // --------------------------------
   const handleDelete = async () => {
     if (!editingAppointment) return;
     const yes = window.confirm('Are you sure you want to delete this appointment?');
@@ -190,20 +209,17 @@ export default function AdminAppointmentModal({
     await mutateAppointment(data);
   };
 
-  // If closed => return null
+  // If the modal is closed => return nothing
   if (!isOpen) return null;
 
+  // --------------------------------
+  // Render the modal
+  // --------------------------------
   return (
-    <div
-      className="
-        fixed inset-0 bg-black bg-opacity-50 z-50
-        flex items-center justify-center
-      "
-    >
-      {/* Outer wrapper that allows scrolling on mobile */}
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
       <div className="w-full max-w-2xl mx-auto m-4 rounded-lg shadow-md overflow-hidden max-h-[90vh] overflow-y-auto">
         <div className="bg-white flex flex-col h-full">
-          {/* Modal Header */}
+          {/* --- Header --- */}
           <div className="flex justify-between items-center border-b p-4">
             <h2 className="text-xl font-semibold">
               {isEditing ? 'Edit Appointment' : 'Create Appointment'}
@@ -213,7 +229,7 @@ export default function AdminAppointmentModal({
             </button>
           </div>
 
-          {/* If editing, show read-only info up top */}
+          {/* If editing => show "Currently scheduled" details */}
           {isEditing && editingAppointment?.user && (
             <div className="px-4 py-2 bg-gray-50 border-b text-sm text-gray-700">
               <p className="font-medium">
@@ -221,16 +237,15 @@ export default function AdminAppointmentModal({
                 (<span className="text-gray-600">{editingAppointment.user.email}</span>)
               </p>
               <p className="mt-1">
-                <span className="font-medium">Currently scheduled:</span>{' '}
-                {originalTimeString}
+                <span className="font-medium">Currently scheduled:</span> {originalTimeString}
               </p>
             </div>
           )}
 
-          {/* Scrollable content */}
+          {/* --- Body Form --- */}
           <FormProvider {...methods}>
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-              {/* If creating => show user picker */}
+              {/* Only show user picker if creating a brand-new appointment */}
               {!isEditing && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -238,21 +253,24 @@ export default function AdminAppointmentModal({
                   </label>
                   <UserSearchSelect
                     onSelectUser={(uid) => {
-                      methods.setValue('user_id', String(uid));
+                      methods.setValue('user_id', String(uid), { shouldValidate: true });
                       setSelectedUserId(String(uid));
                     }}
                   />
                 </div>
               )}
 
+              {/* Dentist & Appt Type */}
               <DentistSelect />
               <AppointmentTypeSelect />
 
+              {/* Date/Time pickers */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <DatePicker editingAppointmentId={editingAppointment?.id} />
                 <TimeSlotPicker editingAppointmentId={editingAppointment?.id} />
               </div>
 
+              {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Additional Notes
@@ -264,7 +282,7 @@ export default function AdminAppointmentModal({
                 />
               </div>
 
-              {/* Check-in toggle (only for editing) */}
+              {/* For editing => can toggle "checked_in" */}
               {isEditing && (
                 <div className="flex items-center space-x-2">
                   <input
@@ -279,7 +297,7 @@ export default function AdminAppointmentModal({
                 </div>
               )}
 
-              {/* Footer: Delete (if editing), Cancel, Save */}
+              {/* --- Footer: Delete (if editing), Cancel, Save --- */}
               <div className="flex justify-end space-x-4 pt-2">
                 {isEditing && (
                   <Button variant="danger" type="button" onClick={handleDelete}>
@@ -305,6 +323,9 @@ export default function AdminAppointmentModal({
   );
 }
 
+// --------------------------------
+// Helper
+// --------------------------------
 function buildIsoString(dateStr: string, timeStr: string) {
   if (!dateStr || !timeStr) return '';
   const [year, month, day] = dateStr.split('-').map(Number);

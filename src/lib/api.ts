@@ -109,7 +109,9 @@ export async function createAppointment(data: {
   dentist_id: number;
   appointment_type_id: number;
   notes?: string;
-  child_user_id?: number;
+  user_id?: number;        // <-- added for Admin usage
+  child_user_id?: number;  // <-- existing for normal usage
+  checked_in?: boolean;
 }) {
   return api.post('/appointments', {
     appointment: {
@@ -117,7 +119,9 @@ export async function createAppointment(data: {
       dentist_id:          data.dentist_id,
       appointment_type_id: data.appointment_type_id,
       notes:               data.notes || '',
-      child_user_id:       data.child_user_id,
+      user_id:             data.user_id,       // pass if present
+      child_user_id:       data.child_user_id, // pass if present
+      checked_in:          data.checked_in,
     },
   });
 }
@@ -223,9 +227,9 @@ export async function createMyChildUser(data: {
 }) {
   return api.post('/users/my_children', {
     user: {
-      first_name:   data.firstName,
-      last_name:    data.lastName,
-      date_of_birth: data.dateOfBirth
+      first_name:    data.firstName,
+      last_name:     data.lastName,
+      date_of_birth: data.dateOfBirth,
     },
   });
 }
@@ -237,9 +241,9 @@ export async function updateMyChildUser(
 ) {
   return api.patch(`/users/my_children/${childId}`, {
     user: {
-      first_name:   data.firstName,
-      last_name:    data.lastName,
-      date_of_birth: data.dateOfBirth
+      first_name:    data.firstName,
+      last_name:     data.lastName,
+      date_of_birth: data.dateOfBirth,
     },
   });
 }
@@ -262,8 +266,6 @@ export async function getAdminChildren(parentUserId: number) {
   });
 }
 
-// In your /src/lib/api.ts (admin section)
-
 // PATCH /api/v1/admin/children/:childId => update a child user
 export async function updateAdminChildUser(
   childId: number,
@@ -285,7 +287,7 @@ export async function updateAdminChildUser(
       parent_user_id: payload.parent_user_id,
       email:          payload.email,
       phone:          payload.phone,
-      role:           payload.role
+      role:           payload.role,
     },
   });
 }
