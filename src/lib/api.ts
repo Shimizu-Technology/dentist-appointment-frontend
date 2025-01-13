@@ -18,11 +18,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/** Build a full image URL if needed */
+/**
+ * Build a full image URL if needed (e.g. for dentist images).
+ */
 export function buildFullImageUrl(imagePath?: string): string {
   if (!imagePath) return '';
   const trimmedBase = baseURL.replace(/\/$/, '');
-  const baseRoot = trimmedBase.replace(/\/api\/v1$/, '');
+  const baseRoot    = trimmedBase.replace(/\/api\/v1$/, '');
   if (imagePath.startsWith('http') || imagePath.startsWith('//')) {
     return imagePath;
   }
@@ -81,7 +83,7 @@ export async function updateInsurance(insuranceData: {
     user: {
       provider_name: insuranceData.providerName,
       policy_number: insuranceData.policyNumber,
-      plan_type: insuranceData.planType,
+      plan_type:     insuranceData.planType,
     },
   });
 }
@@ -96,7 +98,7 @@ export async function getAppointments(
   opts?: { onlyMine?: boolean }
 ) {
   const params: any = { page, per_page: perPage, dentist_id: dentistId };
-  if (opts?.onlyMine) params.user_id = 'me';
+  if (opts?.onlyMine) params.user_id = 'me'; // “onlyMine” usage
   return api.get('/appointments', { params });
 }
 
@@ -109,8 +111,8 @@ export async function createAppointment(data: {
   dentist_id: number;
   appointment_type_id: number;
   notes?: string;
-  user_id?: number;        // <-- added for Admin usage
-  child_user_id?: number;  // <-- existing for normal usage
+  user_id?: number;       // for admin usage (booking for another user)
+  child_user_id?: number; // normal usage (booking for a child)
   checked_in?: boolean;
 }) {
   return api.post('/appointments', {
@@ -119,8 +121,8 @@ export async function createAppointment(data: {
       dentist_id:          data.dentist_id,
       appointment_type_id: data.appointment_type_id,
       notes:               data.notes || '',
-      user_id:             data.user_id,       // pass if present
-      child_user_id:       data.child_user_id, // pass if present
+      user_id:             data.user_id,
+      child_user_id:       data.child_user_id,
       checked_in:          data.checked_in,
     },
   });
@@ -211,15 +213,12 @@ export async function uploadDentistImage(dentistId: number, file: File) {
 }
 
 /** ----------------------------------------------------------------
- * CHILD USERS (Normal user usage)
+ * CHILD USERS
  * ----------------------------------------------------------------*/
-
-// GET /users/my_children => current user's children
 export async function getMyChildren() {
   return api.get('/users/my_children');
 }
 
-// POST /users/my_children => create child's user under me
 export async function createMyChildUser(data: {
   firstName: string;
   lastName: string;
@@ -234,7 +233,6 @@ export async function createMyChildUser(data: {
   });
 }
 
-// PATCH /users/my_children/:childId => update child
 export async function updateMyChildUser(
   childId: number,
   data: { firstName: string; lastName: string; dateOfBirth: string }
@@ -248,25 +246,19 @@ export async function updateMyChildUser(
   });
 }
 
-// DELETE /users/my_children/:childId => remove child
 export async function deleteMyChildUser(childId: number) {
   return api.delete(`/users/my_children/${childId}`);
 }
 
 /** ----------------------------------------------------------------
- * ADMIN: Manage child users via /api/v1/admin/children
+ * ADMIN: Manage child users
  * ----------------------------------------------------------------*/
-
-/**
- * GET /api/v1/admin/children?parent_user_id=XX
- */
 export async function getAdminChildren(parentUserId: number) {
   return api.get('/admin/children', {
     params: { parent_user_id: parentUserId },
   });
 }
 
-// PATCH /api/v1/admin/children/:childId => update a child user
 export async function updateAdminChildUser(
   childId: number,
   payload: {
@@ -292,9 +284,6 @@ export async function updateAdminChildUser(
   });
 }
 
-/**
- * DELETE /api/v1/admin/children/:id => Remove a child user
- */
 export async function deleteChildUser(childId: number) {
   return api.delete(`/admin/children/${childId}`);
 }
@@ -315,7 +304,7 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
 }
 
 /**
- * Admin: create a user (including child user if is_dependent + parent_user_id are set).
+ * Admin: create a user (including child user if is_dependent + parent_user_id).
  */
 export async function createUser(payload: {
   firstName: string;
@@ -375,6 +364,13 @@ export async function updateUser(
 
 export async function deleteUser(userId: number) {
   return api.delete(`/users/${userId}`);
+}
+
+/**
+ * GET /users/:id => fetch a single user by ID (admin-only).
+ */
+export async function getUser(userId: number) {
+  return api.get(`/users/${userId}`);
 }
 
 /** ----------------------------------------------------------------

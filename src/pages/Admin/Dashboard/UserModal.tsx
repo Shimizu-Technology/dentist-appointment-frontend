@@ -1,8 +1,14 @@
 // File: /src/pages/Admin/Dashboard/UserModal.tsx
+
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X } from 'lucide-react';
-import { createUser, updateUser, deleteUser } from '../../../lib/api';
+import {
+  createUser,
+  updateUser,
+  deleteUser,
+  getUser, // must return { user: {...} } from the backend
+} from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/UI/Button';
 import Input from '../../../components/UI/Input';
@@ -24,42 +30,37 @@ export default function UserModal({
   existingUser,
   afterSave,
 }: UserModalProps) {
-  const queryClient  = useQueryClient();
-  const isEditing    = !!existingUser;
-  const hasInit      = useRef(false);
+  const queryClient = useQueryClient();
+  const isEditing   = !!existingUser;
+  const hasInit     = useRef(false);
 
   // Basic fields
-  const [role, setRole]             = useState<'user' | 'admin' | 'phone_only'>('user');
-  const [firstName, setFirstName]   = useState('');
-  const [lastName,  setLastName]    = useState('');
-  const [phone,     setPhone]       = useState('');
-  const [email,     setEmail]       = useState('');
+  const [role,      setRole]      = useState<'user' | 'admin' | 'phone_only'>('user');
+  const [firstName, setFirstName] = useState('');
+  const [lastName,  setLastName]  = useState('');
+  const [phone,     setPhone]     = useState('');
+  const [email,     setEmail]     = useState('');
 
   // Dependent logic
-  const [isDependent, setIsDependent]          = useState(false);
-  const [parentUserId, setParentUserId]        = useState<number | null>(null);
-  const [parentUserName, setParentUserName]    = useState('');
-  const [parentSelectOpen, setParentSelectOpen] = useState(false);
+  const [isDependent,       setIsDependent]       = useState(false);
+  const [parentUserId,      setParentUserId]      = useState<number | null>(null);
+  const [parentInfo,        setParentInfo]        = useState<User | null>(null);
+  const [parentSelectOpen,  setParentSelectOpen]  = useState(false);
 
-  // Manage Dependents (only for editing)
+  // Manage Dependents (if editing user who is NOT a dependent)
   const [dependentsModalOpen, setDependentsModalOpen] = useState(false);
 
-  /**
-   * Initialize fields when the modal first opens
-   */
+  // Initialize fields once per open
   useEffect(() => {
     if (!isOpen) {
-      // If modal is closing, reset so next time it opens, we re-init
       hasInit.current = false;
       return;
     }
     if (isOpen && !hasInit.current) {
       hasInit.current = true;
-      console.log('[UserModal] Opening. existingUser:', existingUser);
 
       if (existingUser) {
-        // Editing an existing user
-        console.log('[UserModal] Setting fields for EDIT user');
+        // Editing existing user
         setRole(existingUser.role);
         setFirstName(existingUser.firstName);
         setLastName(existingUser.lastName);
@@ -68,50 +69,52 @@ export default function UserModal({
         setIsDependent(!!existingUser.isDependent);
 
         setParentUserId(existingUser.parentUserId || null);
-        setParentUserName(''); // If we need the parent's name, we can fetch it or pass it in
+        setParentInfo(null);
       } else {
-        // Creating a new user
-        console.log('[UserModal] Setting fields for NEW user');
+        // Creating new
         setRole('user');
         setFirstName('');
         setLastName('');
-        setPhone('+1671'); // default prefix for new normal user
+        setPhone('+1671'); // default prefix for normal new user
         setEmail('');
         setIsDependent(false);
+
         setParentUserId(null);
-        setParentUserName('');
+        setParentInfo(null);
       }
     }
   }, [isOpen, existingUser]);
 
-  /**
-   * Called by ParentSelectModal after user picks a parent from the list
-   * Now that we pass the full user object, we can show the parent's name.
-   */
-  function handleSelectParent(parentUser: User) {
-    console.log('[UserModal] handleSelectParent => got parent user object:', parentUser);
-    setParentUserId(parentUser.id);
-    setParentUserName(`${parentUser.firstName} ${parentUser.lastName}`);
+  // If editing a dependent with a parent, fetch parent's details
+  useEffect(() => {
+    async function fetchParent() {
+      if (isEditing && isDependent && parentUserId) {
+        try {
+          const res = await getUser(parentUserId);
+          // IMPORTANT: the backend returns { user: {...} },
+          // so we must grab `res.data.user`
+          const parent = res.data.user;
+          setParentInfo(parent);
+        } catch (err: any) {
+          console.error('[UserModal] Could not fetch parent info =>', err);
+          setParentInfo(null);
+        }
+      } else {
+        setParentInfo(null);
+      }
+    }
+    fetchParent();
+  }, [isEditing, isDependent, parentUserId]);
+
+  // Called by <ParentSelectModal> after picking a parent
+  function handleSelectParent(parent: User) {
+    setParentUserId(parent.id);
+    setParentInfo(parent);
     setParentSelectOpen(false);
   }
 
-  /**
-   * Create or update user
-   */
+  // Create or update
   async function handleSave() {
-    console.log('[UserModal] handleSave =>', {
-      isEditing,
-      isDependent,
-      role,
-      firstName,
-      lastName,
-      phone,
-      email,
-      parentUserId,
-      parentUserName,
-    });
-
-    // 1) Basic validation
     if (!firstName.trim()) {
       toast.error('First name is required.');
       return;
@@ -121,15 +124,13 @@ export default function UserModal({
       return;
     }
 
-    // If dependent => must have a parent. No phone or email required.
     if (isDependent) {
       if (!parentUserId) {
         toast.error('Please select a parent user for this dependent.');
-        console.log('[UserModal] No parent user selected => cannot save');
         return;
       }
     } else {
-      // Normal user => phone required, email required if not phone_only
+      // Normal user => phone required, maybe email
       if (!phone.trim()) {
         toast.error('Phone is required for a non-dependent user.');
         return;
@@ -142,10 +143,7 @@ export default function UserModal({
 
     try {
       if (isEditing && existingUser) {
-        // 2) Updating existing user
-        console.log('[UserModal] Updating user ID=', existingUser.id);
-
-        // If user is now a dependent, we override phone/email with blank
+        // Updating existing
         const newPhone = isDependent ? '' : phone;
         const newEmail = isDependent ? '' : email.trim();
 
@@ -155,28 +153,24 @@ export default function UserModal({
           lastName,
           phone: newPhone,
           email: newEmail,
-          // If you allow changing from normal => dependent:
           is_dependent: isDependent,
           parent_user_id: isDependent ? parentUserId : null,
         });
         toast.success('User updated!');
       } else {
-        // 3) Creating new
+        // Creating new
         if (isDependent) {
-          // Force phone_only role for a brand-new dependent
-          console.log('[UserModal] Creating new dependent...');
           await createUser({
             role: 'phone_only',
             firstName,
             lastName,
-            phone: '',   // no phone
-            email: '',   // no email
+            phone: '',  // no phone for child
+            email: '',  // no email for child
             is_dependent: true,
-            parent_user_id: parentUserId!, // we know it's not null
+            parent_user_id: parentUserId!,
           });
           toast.success('Dependent created!');
         } else {
-          console.log('[UserModal] Creating new normal user...');
           await createUser({
             role,
             firstName,
@@ -194,21 +188,18 @@ export default function UserModal({
       onClose();
       afterSave?.();
     } catch (err: any) {
-      console.error('[UserModal] handleSave() error =>', err);
+      console.error('[UserModal] handleSave() => error:', err);
       const msg = err?.response?.data?.errors?.join(', ') || err.message;
       toast.error(`Failed to save user: ${msg}`);
     }
   }
 
-  /**
-   * Delete user (only if editing)
-   */
+  // Delete user
   async function handleDelete() {
     if (!existingUser) return;
     const yes = window.confirm('Are you sure you want to delete this user?');
     if (!yes) return;
 
-    console.log('[UserModal] Deleting user ID=', existingUser.id);
     try {
       await deleteUser(existingUser.id);
       toast.success('User deleted!');
@@ -222,18 +213,20 @@ export default function UserModal({
     }
   }
 
+  // Show "Manage Dependents" only if editing an existing user who is NOT a dependent
+  const canManageDependents = isEditing && !isDependent;
+
   return (
     <Transition show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
-        {/* Overlay */}
         <Transition.Child as={Fragment}>
           <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
         </Transition.Child>
 
-        {/* Panel */}
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Transition.Child as={Fragment}>
             <Dialog.Panel className="mx-auto w-full max-w-lg rounded-md bg-white shadow-lg">
+              
               {/* Header */}
               <div className="flex justify-between items-center p-4 border-b">
                 <Dialog.Title className="text-xl font-semibold">
@@ -245,33 +238,29 @@ export default function UserModal({
               </div>
 
               {/* Body */}
-              <div className="p-4 space-y-4">
-                {isEditing && (
+              <div className="p-4 space-y-6">
+                {canManageDependents && (
                   <div className="text-right">
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        console.log('[UserModal] Opening manageDependents...');
-                        setDependentsModalOpen(true);
-                      }}
+                      onClick={() => setDependentsModalOpen(true)}
                     >
                       Manage Dependents
                     </Button>
                   </div>
                 )}
 
-                {/* Show "Is this a Dependent?" only if creating new */}
+                {/* If brand-new => "Is this a Dependent?" */}
                 {!isEditing && (
                   <label className="flex items-center space-x-2">
                     <input
                       type="checkbox"
                       checked={isDependent}
                       onChange={(e) => {
-                        console.log('[UserModal] Toggling isDependent =>', e.target.checked);
                         setIsDependent(e.target.checked);
                         if (!e.target.checked) {
                           setParentUserId(null);
-                          setParentUserName('');
+                          setParentInfo(null);
                         }
                       }}
                     />
@@ -279,7 +268,7 @@ export default function UserModal({
                   </label>
                 )}
 
-                {/* If not dependent => show a role dropdown (only for brand-new user) */}
+                {/* If not dependent => show Role dropdown (only if brand-new user) */}
                 {!isDependent && !isEditing && (
                   <div>
                     <label className="block text-sm font-medium mb-1">
@@ -288,10 +277,7 @@ export default function UserModal({
                     <select
                       className="border w-full rounded-md px-3 py-2"
                       value={role}
-                      onChange={(e) => {
-                        console.log('[UserModal] Role changed =>', e.target.value);
-                        setRole(e.target.value as 'user' | 'admin' | 'phone_only');
-                      }}
+                      onChange={(e) => setRole(e.target.value as 'user' | 'admin' | 'phone_only')}
                     >
                       <option value="user">Regular User</option>
                       <option value="admin">Admin</option>
@@ -300,7 +286,7 @@ export default function UserModal({
                   </div>
                 )}
 
-                {/* Names */}
+                {/* First & Last names */}
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="First Name"
@@ -316,7 +302,7 @@ export default function UserModal({
                   />
                 </div>
 
-                {/* If not dependent => show phone & maybe email */}
+                {/* Normal user => phone & maybe email */}
                 {!isDependent && (
                   <>
                     <Input
@@ -336,24 +322,45 @@ export default function UserModal({
                   </>
                 )}
 
-                {/* If dependent => must pick a parent */}
+                {/* Dependent => show parent's info */}
                 {isDependent && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Select Parent User
-                    </label>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        console.log('[UserModal] Opening parentSelect modal...');
-                        setParentSelectOpen(true);
-                      }}
-                    >
-                      {parentUserId
-                        ? `Parent: ${parentUserName || '(Unknown)'}`
-                        : 'Select Parent'
-                      }
-                    </Button>
+                  <div className="space-y-2">
+                    {/* If brand-new dependent => "Select Parent" button if none selected */}
+                    {!isEditing && !parentUserId && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setParentSelectOpen(true)}
+                      >
+                        Select Parent
+                      </Button>
+                    )}
+
+                    {/* Show parent's info if we have parentUserId or parentInfo */}
+                    <div className="p-3 border border-gray-200 rounded-md bg-gray-50 text-sm space-y-1">
+                      <h4 className="font-semibold text-gray-700 mb-1">
+                        Parent’s Info
+                      </h4>
+
+                      {parentUserId && parentInfo ? (
+                        <>
+                          <p className="text-gray-900">
+                            {parentInfo.firstName} {parentInfo.lastName}
+                          </p>
+                          {parentInfo.email && (
+                            <p className="text-gray-600">{parentInfo.email}</p>
+                          )}
+                          {parentInfo.phone && (
+                            <p className="text-gray-600">{parentInfo.phone}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-gray-500">
+                          {isEditing
+                            ? 'No parent assigned.'
+                            : 'Please select a parent.'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -375,7 +382,7 @@ export default function UserModal({
                 </Button>
               </div>
 
-              {/* ParentSelectModal => pass handleSelectParent, which receives the *entire* user object */}
+              {/* ParentSelectModal => only if brand-new dependent & user clicks "Select Parent" */}
               {parentSelectOpen && (
                 <ParentSelectModal
                   isOpen={parentSelectOpen}
@@ -384,8 +391,8 @@ export default function UserModal({
                 />
               )}
 
-              {/* Manage Dependents => only if editing */}
-              {dependentsModalOpen && existingUser && (
+              {/* Manage Dependents => only if editing & not a dependent */}
+              {dependentsModalOpen && existingUser && !existingUser.isDependent && (
                 <UserDependentsModal
                   isOpen={dependentsModalOpen}
                   onClose={() => setDependentsModalOpen(false)}

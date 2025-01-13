@@ -23,11 +23,11 @@ export default function UsersList() {
   const [debouncedTerm, setDebouncedTerm] = useState('');
   const [page, setPage] = useState(1);
 
-  // For UserModal
+  // For the UserModal
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // Debounce the search
+  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedTerm(searchTerm.trim());
@@ -67,7 +67,7 @@ export default function UsersList() {
   }
 
   function handleCreateUser() {
-    setEditingUser(null);
+    setEditingUser(null); // brand new
     setUserModalOpen(true);
   }
 
@@ -76,15 +76,30 @@ export default function UsersList() {
     setUserModalOpen(true);
   }
 
-  // A helper for color-coded role badges:
-  function roleBadgeClass(role: string) {
-    switch (role) {
+  /**
+   * This helper function picks a badge label & style
+   * for each user’s “status” on the tile.
+   */
+  function getRoleLabel(u: User) {
+    // If isDependent => show "dependent"
+    if (u.isDependent) {
+      return 'dependent';
+    }
+    // Otherwise fallback to their role
+    return u.role;
+  }
+
+  function getRoleBadgeClass(label: string) {
+    // You can customize these classes or add more if you like
+    switch (label) {
       case 'admin':
         return 'bg-purple-100 text-purple-800';
       case 'user':
         return 'bg-green-100 text-green-800';
       case 'phone_only':
         return 'bg-blue-100 text-blue-800';
+      case 'dependent':
+        return 'bg-pink-100 text-pink-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -96,7 +111,7 @@ export default function UsersList() {
 
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label className="block text-sm font-medium mb-1">Search</label>
+          <label className="block text-sm font-medium mb-1">Name or Email</label>
           <input
             type="text"
             className="border rounded px-2 py-1"
@@ -123,26 +138,40 @@ export default function UsersList() {
         <p className="text-red-600">Error loading users: {String(error)}</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {users.map((u) => (
-            <div
-              key={u.id}
-              className="p-4 bg-white rounded shadow hover:shadow-md cursor-pointer"
-              onClick={() => handleEditUser(u)}
-            >
-              <h2 className="font-semibold text-lg">
-                {u.firstName} {u.lastName}
-              </h2>
-              {u.email && <p className="text-gray-600 text-sm">{u.email}</p>}
-              {u.phone && <p className="text-sm text-gray-500">{u.phone}</p>}
+          {users.map((u) => {
+            const label = getRoleLabel(u); // "admin", "user", "phone_only", or "dependent"
+            const badgeClasses = getRoleBadgeClass(label);
 
-              {/* role badge */}
-              <span
-                className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full ${roleBadgeClass(u.role)}`}
+            return (
+              <div
+                key={u.id}
+                className="p-4 bg-white rounded shadow hover:shadow-md cursor-pointer"
+                onClick={() => handleEditUser(u)}
               >
-                {u.role}
-              </span>
-            </div>
-          ))}
+                <h2 className="font-semibold text-lg">
+                  {u.firstName} {u.lastName}
+                </h2>
+                {/* If they are NOT a dependent & have email, show it */}
+                {(!u.isDependent && u.email) && (
+                  <p className="text-gray-600 text-sm">{u.email}</p>
+                )}
+                {/* If they are NOT a dependent & have phone, show it */}
+                {(!u.isDependent && u.phone) && (
+                  <p className="text-sm text-gray-500">{u.phone}</p>
+                )}
+
+                {/* If they ARE a dependent, you might omit phone/email. 
+                    Or you could show them if you like. Up to you. */}
+
+                {/* role badge OR dependent badge */}
+                <span
+                  className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full ${badgeClasses}`}
+                >
+                  {label}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -165,7 +194,7 @@ export default function UsersList() {
           onClose={() => setUserModalOpen(false)}
           existingUser={editingUser}
           afterSave={() => {
-            // do nothing or refetch
+            // Could refetch or do nothing
           }}
         />
       )}
