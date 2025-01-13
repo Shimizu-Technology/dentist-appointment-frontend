@@ -47,19 +47,22 @@ export default function UserModal({
 
   useEffect(() => {
     if (!isOpen) return;
+
     if (existingUser) {
+      // Editing existing user
       setRole(existingUser.role);
       setFirstName(existingUser.firstName);
       setLastName(existingUser.lastName);
-      setPhone(existingUser.phone || '');
+      setPhone(existingUser.phone || ''); // if their phone is blank, it remains blank
       setEmail(existingUser.email || '');
       setIsDependent(false);
       setParentUserId(null);
     } else {
+      // Creating new user
       setRole('user');
       setFirstName('');
       setLastName('');
-      setPhone('');
+      setPhone('+1671'); // Default to +1671 if creating new user
       setEmail('');
       setIsDependent(false);
       setParentUserId(null);
@@ -86,6 +89,7 @@ export default function UserModal({
 
     try {
       if (isEditing && existingUser) {
+        // Update existing
         await updateUser(existingUser.id, {
           role,
           firstName,
@@ -95,7 +99,7 @@ export default function UserModal({
         });
         toast.success('User updated!');
       } else {
-        // create new user
+        // Create new user
         if (isDependent) {
           if (!parentUserId) {
             toast.error('Please select a parent user for this dependent.');

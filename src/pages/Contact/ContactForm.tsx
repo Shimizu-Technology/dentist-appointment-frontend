@@ -1,4 +1,5 @@
 // File: /src/pages/Contact/ContactForm.tsx
+
 import { useForm } from 'react-hook-form';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -17,6 +18,9 @@ export default function ContactForm() {
     formState: { errors, isSubmitting, isValid },
   } = useForm<ContactFormData>({
     mode: 'onChange',
+    defaultValues: {
+      phone: '+1671', // If you want the same default for the contact form
+    },
   });
 
   const onSubmit = async (data: ContactFormData) => {
@@ -26,8 +30,10 @@ export default function ContactForm() {
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold text-gray-900 mb-6">Send us a Message</h2>
-      
+      <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+        Send us a Message
+      </h2>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Input
           label="Full Name"
@@ -64,7 +70,6 @@ export default function ContactForm() {
           error={errors.phone?.message}
         />
 
-        {/* For textarea, we don’t have a custom <Input>—just do the asterisk manually */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Message <span className="text-red-500 ml-1">*</span>

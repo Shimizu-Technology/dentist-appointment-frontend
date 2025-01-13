@@ -344,7 +344,9 @@ export default function RemindersList() {
                 Phone
               </label>
               <input
-                type="text"
+                type="tel"
+                pattern="^\+?[1-9]\d{1,14}$"
+                placeholder="+16715551234"
                 className="border p-2 w-full"
                 value={editingReminder.phone || ''}
                 onChange={(e) =>

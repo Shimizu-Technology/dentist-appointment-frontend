@@ -18,14 +18,17 @@ interface ProfileFormData {
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string;
-  // If you want date of birth for main user:
-  // dateOfBirth?: string;
+  phone: string;
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const { user, setAuth } = useAuthStore();
   const queryClient = useQueryClient();
+
+  // If the user’s phone is blank, default to +1671
+  const defaultPhone = user?.phone && user.phone.trim() !== ''
+    ? user.phone
+    : '+1671';
 
   const {
     register,
@@ -37,8 +40,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       firstName: user?.firstName || '',
       lastName: user?.lastName || '',
       email: user?.email || '',
-      phone: user?.phone || '',
-      // dateOfBirth: user?.dateOfBirth || '', // If you want to show it
+      phone: defaultPhone, // Use +1671 if blank
     },
   });
 
@@ -49,7 +51,6 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
         last_name: data.lastName,
         email: data.email,
         phone: data.phone,
-        // date_of_birth: data.dateOfBirth, // if you have that
       };
       return updateCurrentUser(payload);
     },
@@ -128,14 +129,6 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             })}
             error={errors.phone?.message}
           />
-
-          {/* If you want a DOB field for the main user: */}
-          {/* <Input
-            label="Date of Birth"
-            type="date"
-            {...register('dateOfBirth')}
-            error={errors.dateOfBirth?.message}
-          /> */}
 
           <div className="flex justify-end space-x-4 pt-4">
             <Button

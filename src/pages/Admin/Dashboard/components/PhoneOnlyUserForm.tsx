@@ -64,7 +64,9 @@ export default function PhoneOnlyUserForm({ onCreateSuccess, onCancel }: PhoneOn
       <div>
         <label className="block text-sm font-medium text-gray-700">Phone</label>
         <input
-          type="text"
+          type="tel"
+          pattern="^\+?[1-9]\d{1,14}$"
+          placeholder="+16715551234"
           className="mt-1 block w-full border rounded-md px-3 py-2 text-sm"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}

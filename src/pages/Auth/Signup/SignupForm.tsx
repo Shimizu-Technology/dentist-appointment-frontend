@@ -16,13 +16,19 @@ interface SignupFormData {
 
 export default function SignupForm() {
   const { signup } = useAuth();
+
   const {
     register,
     handleSubmit,
     watch,
     setError,
     formState: { errors, isSubmitting, isValid },
-  } = useForm<SignupFormData>({ mode: 'onChange' });
+  } = useForm<SignupFormData>({
+    mode: 'onChange',
+    defaultValues: {
+      phone: '+1671', // Pre-fill phone with +1671
+    },
+  });
 
   const onSubmit = async (data: SignupFormData) => {
     // Attempt signup
@@ -99,7 +105,7 @@ export default function SignupForm() {
       <Input
         label="Phone Number"
         type="tel"
-        placeholder="(555) 123-4567"
+        placeholder="(555) 123-4567 or +16715551234"
         required
         {...register('phone', {
           required: 'Phone number is required',
