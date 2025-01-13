@@ -1,5 +1,5 @@
 // File: /src/pages/Profile/EditProfileModal.tsx
-
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import Button from '../../components/UI/Button';
@@ -15,20 +15,54 @@ interface EditProfileModalProps {
 }
 
 interface ProfileFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string; // New field
+  firstName:    string;
+  lastName:     string;
+  email:        string;
+  phone:        string;
+  dateOfBirth:  string; // "YYYY-MM-DD" for <input type="date" />
+}
+
+/**
+ * Convert "MM/DD/YYYY" => "YYYY-MM-DD" for <input type="date" /> usage.
+ * If user.dateOfBirth is already "YYYY-MM-DD", we just return it.
+ * Logs each step for debugging.
+ */
+function parseToInputDate(dob?: string | null): string {
+  console.log('[parseToInputDate] incoming dob =', dob);
+  if (!dob) {
+    console.log('[parseToInputDate] => returning empty (no DOB)');
+    return '';
+  }
+
+  const trimmed = dob.trim();
+
+  // If the string is already in "YYYY-MM-DD", we’ll just return it.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    console.log('[parseToInputDate] => recognized as "YYYY-MM-DD", returning it directly:', trimmed);
+    return trimmed;
+  }
+
+  // Otherwise, we attempt to parse "MM/DD/YYYY"
+  const parts = trimmed.split('/');
+  if (parts.length === 3) {
+    const [mm, dd, yyyy] = parts;
+    const y = (yyyy || '').padStart(4, '0');
+    const m = (mm    || '').padStart(2, '0');
+    const d = (dd    || '').padStart(2, '0');
+    const result = `${y}-${m}-${d}`;
+    console.log('[parseToInputDate] => recognized as "MM/DD/YYYY", returning =>', result);
+    return result;
+  }
+
+  console.log('[parseToInputDate] => unrecognized format, returning empty string');
+  return '';
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const { user, setAuth } = useAuthStore();
-  const queryClient = useQueryClient();
+  const queryClient       = useQueryClient();
 
-  // Safely handle defaults (if user is null, it means not logged in)
-  const defaultPhone = user?.phone && user.phone.trim() !== '' ? user.phone : '+1671';
-
+  // We'll set up react-hook-form with a "reset" in useEffect, so minimal defaults here:
   const {
     register,
     handleSubmit,
@@ -37,48 +71,61 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
   } = useForm<ProfileFormData>({
     mode: 'onChange',
     defaultValues: {
-      firstName:    user?.firstName || '',
-      lastName:     user?.lastName || '',
-      email:        user?.email || '',
-      phone:        defaultPhone,
-      dateOfBirth:  user?.dateOfBirth || '', 
+      firstName:   '',
+      lastName:    '',
+      email:       '',
+      phone:       '+1671',
+      dateOfBirth: '',
     },
   });
 
-  // If the modal is opened/closed, we can reset the form to the user’s current data
-  // (In case user re-opens modal without refreshing)
-  // This is optional but can be helpful:
-  // useEffect(() => {
-  //   if (isOpen && user) {
-  //     reset({ ... });
-  //   }
-  // }, [isOpen, user, reset]);
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    console.log('[EditProfileModal] user =>', user);
+
+    if (user) {
+      // If we do have a user, parse the date into "YYYY-MM-DD"
+      const parsedDOB = parseToInputDate(user.dateOfBirth);
+      reset({
+        firstName:   user.firstName   || '',
+        lastName:    user.lastName    || '',
+        email:       user.email       || '',
+        phone:       user.phone       || '+1671',
+        dateOfBirth: parsedDOB,
+      });
+      console.log('[EditProfileModal] after parse, dateOfBirth =>', parsedDOB);
+    }
+  }, [isOpen, user, reset]);
 
   const mutation = useMutation({
     mutationFn: (data: ProfileFormData) => {
+      console.log('[EditProfileModal] onSubmit => data:', data);
       return updateCurrentUser({
         first_name:    data.firstName,
         last_name:     data.lastName,
         email:         data.email,
         phone:         data.phone,
-        date_of_birth: data.dateOfBirth || undefined,
+        date_of_birth: data.dateOfBirth || undefined, // if empty, pass undefined
       });
     },
     onSuccess: (response) => {
-      const updatedUser = response.data;
-      setAuth(updatedUser, localStorage.getItem('token') || '');
+      console.log('[EditProfileModal] updateCurrentUser success =>', response.data);
+      setAuth(response.data, localStorage.getItem('token') || '');
       queryClient.invalidateQueries(['user']);
       toast.success('Profile updated successfully!');
       onClose();
     },
     onError: (err: any) => {
+      console.error('[EditProfileModal] updateCurrentUser error =>', err);
       toast.error(`Failed to update profile: ${err.message}`);
     },
   });
 
-  const onSubmit = (data: ProfileFormData) => {
-    mutation.mutate(data);
-  };
+  function onSubmit(formData: ProfileFormData) {
+    mutation.mutate(formData);
+  }
 
   if (!isOpen) return null;
 
@@ -99,6 +146,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
         {/* Form Body */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          {/* First & Last names */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="First Name"
@@ -114,6 +162,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             />
           </div>
 
+          {/* Email */}
           <Input
             label="Email"
             type="email"
@@ -128,6 +177,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             error={errors.email?.message}
           />
 
+          {/* Phone */}
           <Input
             label="Phone"
             type="tel"
@@ -140,7 +190,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             error={errors.phone?.message}
           />
 
-          {/* NEW: Date of Birth */}
+          {/* DOB => "YYYY-MM-DD" */}
           <Input
             label="Date of Birth"
             type="date"
@@ -148,6 +198,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             error={errors.dateOfBirth?.message}
           />
 
+          {/* Footer buttons */}
           <div className="flex justify-end space-x-4 pt-4">
             <Button
               type="button"

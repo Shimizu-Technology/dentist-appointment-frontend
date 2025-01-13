@@ -24,7 +24,7 @@ api.interceptors.request.use((config) => {
 export function buildFullImageUrl(imagePath?: string): string {
   if (!imagePath) return '';
   const trimmedBase = baseURL.replace(/\/$/, '');
-  const baseRoot    = trimmedBase.replace(/\/api\/v1$/, '');
+  const baseRoot = trimmedBase.replace(/\/api\/v1$/, '');
   if (imagePath.startsWith('http') || imagePath.startsWith('//')) {
     return imagePath;
   }
@@ -65,19 +65,30 @@ export async function signup(
 /** ----------------------------------------------------------------
  * CURRENT USER
  * ----------------------------------------------------------------*/
+
+/**
+ * GET /users/current => returns { user: {...} }
+ */
+export async function getCurrentUser() {
+  return api.get('/users/current');
+}
+
+/**
+ * PATCH /users/current => update user
+ */
 export async function updateCurrentUser(data: {
   first_name?: string;
   last_name?: string;
   phone?: string;
   email?: string;
-  date_of_birth?: string;
+  date_of_birth?: string; // allow passing DOB
 }) {
   return api.patch('/users/current', {
     user: {
-      first_name:    data.first_name,
-      last_name:     data.last_name,
-      phone:         data.phone,
-      email:         data.email,
+      first_name: data.first_name,
+      last_name: data.last_name,
+      phone: data.phone,
+      email: data.email,
       date_of_birth: data.date_of_birth,
     },
   });
@@ -92,7 +103,7 @@ export async function updateInsurance(insuranceData: {
     user: {
       provider_name: insuranceData.providerName,
       policy_number: insuranceData.policyNumber,
-      plan_type:     insuranceData.planType,
+      plan_type: insuranceData.planType,
     },
   });
 }
@@ -107,7 +118,7 @@ export async function getAppointments(
   opts?: { onlyMine?: boolean }
 ) {
   const params: any = { page, per_page: perPage, dentist_id: dentistId };
-  if (opts?.onlyMine) params.user_id = 'me'; 
+  if (opts?.onlyMine) params.user_id = 'me';
   return api.get('/appointments', { params });
 }
 
@@ -126,18 +137,21 @@ export async function createAppointment(data: {
 }) {
   return api.post('/appointments', {
     appointment: {
-      appointment_time:    data.appointment_time,
-      dentist_id:          data.dentist_id,
+      appointment_time: data.appointment_time,
+      dentist_id: data.dentist_id,
       appointment_type_id: data.appointment_type_id,
-      notes:               data.notes || '',
-      user_id:             data.user_id,
-      child_user_id:       data.child_user_id,
-      checked_in:          data.checked_in,
+      notes: data.notes || '',
+      user_id: data.user_id,
+      child_user_id: data.child_user_id,
+      checked_in: data.checked_in,
     },
   });
 }
 
-export async function updateAppointment(appointmentId: number, data: Record<string, any>) {
+export async function updateAppointment(
+  appointmentId: number,
+  data: Record<string, any>
+) {
   return api.patch(`/appointments/${appointmentId}`, { appointment: data });
 }
 
@@ -145,7 +159,11 @@ export async function cancelAppointment(appointmentId: number) {
   return api.delete(`/appointments/${appointmentId}`);
 }
 
-export async function getDayAppointments(dentistId: number, date: string, ignoreId?: number) {
+export async function getDayAppointments(
+  dentistId: number,
+  date: string,
+  ignoreId?: number
+) {
   const params: any = { dentist_id: dentistId, date };
   if (ignoreId) params.ignore_id = ignoreId;
   return api.get('/appointments/day_appointments', { params });
@@ -235,8 +253,8 @@ export async function createMyChildUser(data: {
 }) {
   return api.post('/users/my_children', {
     user: {
-      first_name:    data.firstName,
-      last_name:     data.lastName,
+      first_name: data.firstName,
+      last_name: data.lastName,
       date_of_birth: data.dateOfBirth,
     },
   });
@@ -248,8 +266,8 @@ export async function updateMyChildUser(
 ) {
   return api.patch(`/users/my_children/${childId}`, {
     user: {
-      first_name:    data.firstName,
-      last_name:     data.lastName,
+      first_name: data.firstName,
+      last_name: data.lastName,
       date_of_birth: data.dateOfBirth,
     },
   });
@@ -282,13 +300,13 @@ export async function updateAdminChildUser(
 ) {
   return api.patch(`/admin/children/${childId}`, {
     user: {
-      first_name:     payload.firstName,
-      last_name:      payload.lastName,
-      date_of_birth:  payload.dateOfBirth,
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      date_of_birth: payload.dateOfBirth,
       parent_user_id: payload.parent_user_id,
-      email:          payload.email,
-      phone:          payload.phone,
-      role:           payload.role,
+      email: payload.email,
+      phone: payload.phone,
+      role: payload.role,
     },
   });
 }
@@ -313,7 +331,7 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
 }
 
 /**
- * Admin: create a user (including child user if is_dependent + parent_user_id are set).
+ * Admin: create a user (including child user if is_dependent + parent_user_id).
  */
 export async function createUser(payload: {
   firstName: string;
@@ -328,15 +346,15 @@ export async function createUser(payload: {
 }) {
   return api.post('/users', {
     user: {
-      first_name:     payload.firstName,
-      last_name:      payload.lastName,
-      email:          payload.email,
-      phone:          payload.phone,
-      password:       payload.password,
-      role:           payload.role,
-      is_dependent:   payload.is_dependent,
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      email: payload.email,
+      phone: payload.phone,
+      password: payload.password,
+      role: payload.role,
+      is_dependent: payload.is_dependent,
       parent_user_id: payload.parent_user_id,
-      date_of_birth:  payload.date_of_birth,
+      date_of_birth: payload.date_of_birth,
     },
   });
 }
@@ -358,15 +376,15 @@ export async function updateUser(
 ) {
   return api.patch(`/users/${userId}`, {
     user: {
-      first_name:     payload.firstName,
-      last_name:      payload.lastName,
-      email:          payload.email,
-      phone:          payload.phone,
-      password:       payload.password,
-      role:           payload.role,
-      is_dependent:   payload.is_dependent,
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      email: payload.email,
+      phone: payload.phone,
+      password: payload.password,
+      role: payload.role,
+      is_dependent: payload.is_dependent,
       parent_user_id: payload.parent_user_id,
-      date_of_birth:  payload.date_of_birth,
+      date_of_birth: payload.date_of_birth,
     },
   });
 }
@@ -384,7 +402,7 @@ export async function getUser(userId: number) {
 
 /**
  * Re-send invitation for a user (admin-only).
- * PATCH /users/:id/resend_invitation
+ * => PATCH /users/:id/resend_invitation
  */
 export async function resendInvitation(userId: number) {
   return api.patch(`/users/${userId}/resend_invitation`);
