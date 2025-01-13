@@ -11,6 +11,7 @@ import interactionPlugin, {
   EventDropArg,
   EventResizeDoneArg,
   SelectArg,
+  EventMountArg,
 } from '@fullcalendar/interaction';
 
 import {
@@ -51,7 +52,7 @@ export default function AdminCalendar() {
   // “Go to date” feature
   const [searchDate, setSearchDate] = useState('');
 
-  // Appointment modal
+  // Appointment modal (create/edit)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createDate, setCreateDate] = useState<Date | null>(null);
@@ -61,15 +62,13 @@ export default function AdminCalendar() {
     queryKey: ['schedules'],
     queryFn: async () => {
       const res = await getSchedules();
-      return res.data; // => { clinicDaySettings, closedDays, ... }
+      return res.data; // => { clinicDaySettings, closedDays, dentistUnavailabilities, ... }
     },
   });
-
-  // Extract day-of-week settings & closed days
   const daySettings: ClinicDaySetting[] = scheduleData?.clinicDaySettings || [];
   const closedData: ClosedDay[] = scheduleData?.closedDays || [];
 
-  // 2) Dentists for the filter
+  // 2) Fetch Dentists for the dropdown filter
   const { data: dentistData = [] } = useQuery<Dentist[]>({
     queryKey: ['dentists'],
     queryFn: async () => {
@@ -78,18 +77,18 @@ export default function AdminCalendar() {
     },
   });
 
-  // 3) Large set of appointments for the calendar
+  // 3) Fetch a large set of appointments for the calendar
   const { data: apptData, error: apptError } = useQuery<PaginatedAppointments>({
     queryKey: ['admin-appointments-for-calendar', selectedDentistId],
     queryFn: async () => {
       const dentistIdNum = selectedDentistId ? parseInt(selectedDentistId, 10) : undefined;
-      // fetch enough results so the calendar has everything it needs
+      // fetch a high limit so the calendar has everything it needs
       const response = await getAppointments(1, 9999, dentistIdNum);
       return response.data;
     },
   });
 
-  // Optionally exclude canceled appointments from the calendar
+  // Filter out cancelled appointments
   let appointments = apptData?.appointments || [];
   appointments = appointments.filter((a) => a.status !== 'cancelled');
 
@@ -100,15 +99,24 @@ export default function AdminCalendar() {
     const end = new Date(start.getTime() + dur * 60000);
 
     // Simple color logic
-    let backgroundColor = '#86efac'; // green
+    let backgroundColor = '#86efac'; // green for scheduled
     if (appt.status === 'completed') backgroundColor = '#93c5fd'; // light blue
     if (appt.checkedIn) backgroundColor = '#fcd34d'; // yellow if checked in
 
+    // Show who it's for in the 'title'
+    const patientName = appt.user
+      ? `${appt.user.firstName} ${appt.user.lastName}`
+      : 'Unknown';
+
+    // Example: "Jane Doe (#123)" or "Jane Doe (Cleaning #123)"
+    // Your choice how you want to format it:
+    const displayedTitle = appt.appointmentType
+      ? `${patientName} (${appt.appointmentType.name} #${appt.id})`
+      : `${patientName} (#${appt.id})`;
+
     return {
       id: String(appt.id),
-      title: appt.appointmentType?.name
-        ? `${appt.appointmentType.name} (#${appt.id})`
-        : `Appt #${appt.id}`,
+      title: displayedTitle,
       start,
       end,
       backgroundColor,
@@ -135,11 +143,12 @@ export default function AdminCalendar() {
     .filter((ds) => ds.isOpen)
     .map((ds) => ({
       daysOfWeek: [ds.dayOfWeek],
-      startTime: ds.openTime,   // "09:00"
-      endTime: ds.closeTime,    // "17:00"
+      startTime: ds.openTime,
+      endTime: ds.closeTime,
     }));
 
-  // FULLCALENDAR handlers
+  // =============== FULLCALENDAR HANDLERS ===============
+
   const handleSelect = useCallback((selectInfo: SelectArg) => {
     setEditingAppointment(null);
     setCreateDate(selectInfo.start);
@@ -153,7 +162,7 @@ export default function AdminCalendar() {
   }, []);
 
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
-    if (clickInfo.event.display === 'background') return; // skip closed-day backgrounds
+    if (clickInfo.event.display === 'background') return;
     const appt = clickInfo.event.extendedProps.appointment as Appointment;
     if (appt) {
       setEditingAppointment(appt);
@@ -199,6 +208,24 @@ export default function AdminCalendar() {
     resizeInfo.revert();
   }, []);
 
+  // Show a tooltip on hover (fix text being cut off + extra info)
+  const handleEventMount = useCallback((mountInfo: EventMountArg) => {
+    // “mountInfo.el” is the rendered element
+    // “mountInfo.event.extendedProps.appointment” is our object
+    const appt = mountInfo.event.extendedProps.appointment as Appointment;
+    if (!appt) return;
+
+    // For a simple native tooltip, set the "title" attribute:
+    const patientName = appt.user
+      ? `${appt.user.firstName} ${appt.user.lastName}`
+      : 'Unknown User';
+    const typeName = appt.appointmentType?.name || 'Appointment';
+    mountInfo.el.title = `${patientName}\n${typeName} (#${appt.id})`;
+    // This line ensures the text in the event doesn’t overflow
+    // by making it display as a block with normal wrapping:
+    mountInfo.el.style.whiteSpace = 'normal';
+  }, []);
+
   // "Go to date" logic
   function handleGoToDate(e: FormEvent) {
     e.preventDefault();
@@ -211,7 +238,7 @@ export default function AdminCalendar() {
     calendarRef.current?.getApi().gotoDate(parsed);
   }
 
-  // If the appointments fetch had an error
+  // If the appointments request had an error
   if (apptError) {
     return (
       <div className="text-red-600 p-4">
@@ -220,6 +247,7 @@ export default function AdminCalendar() {
     );
   }
 
+  // =============== RENDER ===============
   return (
     <div className="space-y-6">
       {/* TOP CONTROLS: Filter + Go-to-date */}
@@ -245,7 +273,10 @@ export default function AdminCalendar() {
         </div>
 
         {/* Go-to-date Form */}
-        <form onSubmit={handleGoToDate} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <form
+          onSubmit={handleGoToDate}
+          className="flex flex-col sm:flex-row items-start sm:items-center gap-2"
+        >
           <label className="font-medium text-gray-700 whitespace-nowrap">Go to date:</label>
           <input
             type="date"
@@ -282,7 +313,7 @@ export default function AdminCalendar() {
 
       {/* FULLCALENDAR CONTAINER */}
       <div className="bg-white p-4 rounded-md shadow overflow-x-auto">
-        <div className="min-w-[320px]"> {/* Force at least 320px to avoid super-squished */}
+        <div className="min-w-[320px]">
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -300,17 +331,18 @@ export default function AdminCalendar() {
             slotDuration="00:15:00"
             snapDuration="00:15:00"
             displayEventTime
-            // Let the calendar auto-size to content
             height="auto"
-            // Make the toolbar a bit friendlier on smaller screens
             headerToolbar={{
               left: 'prev,today,next',
               center: 'title',
               right: 'timeGridDay,timeGridWeek,dayGridMonth',
             }}
+            // The event feed
             events={allEvents}
-            // Some folks also set eventDisplay="block" or "auto"
-            // or dayMaxEventRows = 3, etc. for a friendlier mobile month view.
+            // Show events in a block style (helps avoid text cut-off)
+            eventDisplay="block"
+            // Hook to add a tooltip and fix overflow
+            eventDidMount={handleEventMount}
           />
         </div>
       </div>
