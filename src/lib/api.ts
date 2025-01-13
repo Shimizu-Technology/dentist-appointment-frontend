@@ -97,8 +97,9 @@ export async function getAppointments(
   dentistId?: number,
   opts?: { onlyMine?: boolean }
 ) {
+  // If dentistId is provided, we pass dentist_id param for the backend to filter on.
   const params: any = { page, per_page: perPage, dentist_id: dentistId };
-  if (opts?.onlyMine) params.user_id = 'me'; // “onlyMine” usage
+  if (opts?.onlyMine) params.user_id = 'me'; 
   return api.get('/appointments', { params });
 }
 
@@ -111,8 +112,8 @@ export async function createAppointment(data: {
   dentist_id: number;
   appointment_type_id: number;
   notes?: string;
-  user_id?: number;       // for admin usage (booking for another user)
-  child_user_id?: number; // normal usage (booking for a child)
+  user_id?: number;       // for admin usage
+  child_user_id?: number; // normal usage
   checked_in?: boolean;
 }) {
   return api.post('/appointments', {
