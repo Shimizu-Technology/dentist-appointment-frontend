@@ -70,8 +70,17 @@ export async function updateCurrentUser(data: {
   last_name?: string;
   phone?: string;
   email?: string;
+  date_of_birth?: string;
 }) {
-  return api.patch('/users/current', { user: data });
+  return api.patch('/users/current', {
+    user: {
+      first_name:    data.first_name,
+      last_name:     data.last_name,
+      phone:         data.phone,
+      email:         data.email,
+      date_of_birth: data.date_of_birth,
+    },
+  });
 }
 
 export async function updateInsurance(insuranceData: {
@@ -97,7 +106,6 @@ export async function getAppointments(
   dentistId?: number,
   opts?: { onlyMine?: boolean }
 ) {
-  // If dentistId is provided, we pass dentist_id param for the backend to filter on.
   const params: any = { page, per_page: perPage, dentist_id: dentistId };
   if (opts?.onlyMine) params.user_id = 'me'; 
   return api.get('/appointments', { params });
@@ -112,8 +120,8 @@ export async function createAppointment(data: {
   dentist_id: number;
   appointment_type_id: number;
   notes?: string;
-  user_id?: number;       // for admin usage
-  child_user_id?: number; // normal usage
+  user_id?: number;
+  child_user_id?: number;
   checked_in?: boolean;
 }) {
   return api.post('/appointments', {
@@ -305,7 +313,7 @@ export async function searchUsers(query: string, page = 1, perPage = 10) {
 }
 
 /**
- * Admin: create a user (including child user if is_dependent + parent_user_id).
+ * Admin: create a user (including child user if is_dependent + parent_user_id are set).
  */
 export async function createUser(payload: {
   firstName: string;
@@ -372,6 +380,14 @@ export async function deleteUser(userId: number) {
  */
 export async function getUser(userId: number) {
   return api.get(`/users/${userId}`);
+}
+
+/**
+ * Re-send invitation for a user (admin-only).
+ * PATCH /users/:id/resend_invitation
+ */
+export async function resendInvitation(userId: number) {
+  return api.patch(`/users/${userId}/resend_invitation`);
 }
 
 /** ----------------------------------------------------------------

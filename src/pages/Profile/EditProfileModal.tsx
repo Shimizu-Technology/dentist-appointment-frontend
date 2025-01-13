@@ -19,40 +19,50 @@ interface ProfileFormData {
   lastName: string;
   email: string;
   phone: string;
+  dateOfBirth: string; // New field
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const { user, setAuth } = useAuthStore();
   const queryClient = useQueryClient();
 
-  // If the user’s phone is blank, default to +1671
-  const defaultPhone = user?.phone && user.phone.trim() !== ''
-    ? user.phone
-    : '+1671';
+  // Safely handle defaults (if user is null, it means not logged in)
+  const defaultPhone = user?.phone && user.phone.trim() !== '' ? user.phone : '+1671';
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting, isValid },
+    reset,
   } = useForm<ProfileFormData>({
     mode: 'onChange',
     defaultValues: {
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      phone: defaultPhone, // Use +1671 if blank
+      firstName:    user?.firstName || '',
+      lastName:     user?.lastName || '',
+      email:        user?.email || '',
+      phone:        defaultPhone,
+      dateOfBirth:  user?.dateOfBirth || '', 
     },
   });
 
+  // If the modal is opened/closed, we can reset the form to the user’s current data
+  // (In case user re-opens modal without refreshing)
+  // This is optional but can be helpful:
+  // useEffect(() => {
+  //   if (isOpen && user) {
+  //     reset({ ... });
+  //   }
+  // }, [isOpen, user, reset]);
+
   const mutation = useMutation({
     mutationFn: (data: ProfileFormData) => {
-      const payload = {
-        first_name: data.firstName,
-        last_name: data.lastName,
-        email: data.email,
-        phone: data.phone,
-      };
-      return updateCurrentUser(payload);
+      return updateCurrentUser({
+        first_name:    data.firstName,
+        last_name:     data.lastName,
+        email:         data.email,
+        phone:         data.phone,
+        date_of_birth: data.dateOfBirth || undefined,
+      });
     },
     onSuccess: (response) => {
       const updatedUser = response.data;
@@ -128,6 +138,14 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
               },
             })}
             error={errors.phone?.message}
+          />
+
+          {/* NEW: Date of Birth */}
+          <Input
+            label="Date of Birth"
+            type="date"
+            {...register('dateOfBirth')}
+            error={errors.dateOfBirth?.message}
           />
 
           <div className="flex justify-end space-x-4 pt-4">
