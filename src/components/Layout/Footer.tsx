@@ -8,8 +8,8 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center mb-4">
-              <span className="text-2xl font-bold text-blue-500">ISA</span>
-              <span className="text-2xl font-bold">DENTAL</span>
+              <span className="text-2xl font-bold text-blue-500">DENTAL</span>
+              <span className="text-2xl font-bold">CARE</span>
             </div>
             <p className="text-gray-400">
               Your trusted family dental center in Hagåtña, Guam.
@@ -39,7 +39,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center">
                 <Mail className="w-5 h-5 mr-2 text-blue-500" />
-                <a href="mailto:contact@isadental.com" className="text-gray-400 hover:text-white">contact@isadental.com</a>
+                <a href="mailto:contact@dentalcare.com" className="text-gray-400 hover:text-white">contact@dentalcare.com</a>
               </li>
             </ul>
           </div>

@@ -34,8 +34,8 @@ export default function ContactSection() {
           <div className="text-center">
             <Mail className="w-8 h-8 text-blue-600 mx-auto mb-4" />
             <h3 className="font-medium text-gray-900 mb-2">Email</h3>
-            <a href="mailto:contact@isadental.com" className="text-gray-600 hover:text-blue-600">
-              contact@isadental.com
+            <a href="mailto:contact@dentalcare.com" className="text-gray-600 hover:text-blue-600">
+              contact@dentalcare.com
             </a>
           </div>
 

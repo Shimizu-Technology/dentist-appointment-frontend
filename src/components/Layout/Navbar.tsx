@@ -42,8 +42,8 @@ export default function Navbar() {
           {/* Left: Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
-              <span className="text-2xl font-bold text-blue-600">ISA</span>
-              <span className="text-2xl font-bold text-gray-900">DENTAL</span>
+              <span className="text-2xl font-bold text-blue-600">DENTAL</span>
+              <span className="text-2xl font-bold text-gray-900">CARE</span>
             </Link>
           </div>
 

@@ -35,10 +35,10 @@ export default function ContactInfo() {
           <div>
             <h3 className="font-medium text-gray-900">Email</h3>
             <a 
-              href="mailto:contact@isadental.com"
+              href="mailto:contact@dentalcare.com"
               className="text-gray-600 hover:text-blue-600 mt-1 block"
             >
-              contact@isadental.com
+              contact@dentalcare.com
             </a>
           </div>
         </div>
