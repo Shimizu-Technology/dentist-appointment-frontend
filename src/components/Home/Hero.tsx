@@ -6,7 +6,7 @@ export default function Hero() {
     <div className="relative bg-gradient-to-r from-blue-600 to-blue-700 text-white py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative z-10">
-          <h1 className="text-5xl font-bold mb-4">Welcome to Isa Dental</h1>
+          <h1 className="text-5xl font-bold mb-4">Welcome to Dental Care Center</h1>
           <p className="text-xl mb-8">Your Family Dental Center in Hagåtña, Guam</p>
           <div className="flex flex-wrap gap-4">
             <a

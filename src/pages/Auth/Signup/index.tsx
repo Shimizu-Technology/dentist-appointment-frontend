@@ -8,7 +8,7 @@ export default function Signup() {
           Create your account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Join ISA Dental and schedule your first appointment
+          Join Dental Care Center and schedule your first appointment
         </p>
       </div>
 
